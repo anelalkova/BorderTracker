@@ -24,7 +24,7 @@ Usage:
 """
 
 import argparse
-from datetime import datetime, timezone
+from datetime import timezone
 
 import psycopg2
 import psycopg2.extras
@@ -98,10 +98,6 @@ def fetch_crowdsourced(conn, crossing_id: int) -> list[dict]:
 
 
 def fetch_camera_hourly(conn, crossing_id: int) -> dict:
-    """
-    Returns a dict: hour_bucket (datetime) -> avg_duration_min
-    Built from vehicle_crossings.duration_sec grouped by hour.
-    """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT
@@ -115,13 +111,13 @@ def fetch_camera_hourly(conn, crossing_id: int) -> dict:
             GROUP BY 1
         """, (crossing_id,))
         return {
-            row["hour_bucket"]: {
+            # Keep as UTC-aware — don't strip tzinfo
+            row["hour_bucket"].replace(tzinfo=timezone.utc): {
                 "avg_min": float(row["avg_duration_min"]),
                 "count":   int(row["vehicle_count"]),
             }
             for row in cur.fetchall()
         }
-
 
 def update_flags(conn, updates: list[dict], dry_run: bool):
     """
@@ -134,13 +130,14 @@ def update_flags(conn, updates: list[dict], dry_run: bool):
         return
 
     with conn.cursor() as cur:
-        for u in updates:
-            cur.execute("""
-                UPDATE crowdsourced_waits
-                SET quality_flag   = %s,
-                    camera_avg_min = %s
-                WHERE id = %s
-            """, (u["quality_flag"], u.get("camera_avg_min"), u["id"]))
+        psycopg2.extras.execute_values(cur, """
+                                            UPDATE crowdsourced_waits AS cw
+                                            SET quality_flag   = v.quality_flag,
+                                                camera_avg_min = v.camera_avg_min::real
+                                            FROM (VALUES %s) AS v(id, quality_flag, camera_avg_min)
+                                            WHERE cw.id = v.id
+                                            """,
+                                       [(u["id"], u["quality_flag"], u.get("camera_avg_min")) for u in updates])
     conn.commit()
 
 # ---------------------------------------------------------------------------
@@ -171,9 +168,8 @@ def classify_report(report: dict, camera_hourly: dict) -> tuple[str, float | Non
         from datetime import timedelta
         candidate = bucket + timedelta(hours=delta_h)
         # Strip tzinfo for dict key comparison (stored as naive UTC from DB)
-        candidate_naive = candidate.replace(tzinfo=None)
-        if candidate_naive in camera_hourly:
-            camera = camera_hourly[candidate_naive]
+        if candidate in camera_hourly:
+            camera = camera_hourly[candidate]
             break
 
     if camera is None:

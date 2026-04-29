@@ -93,27 +93,33 @@ def get_crossing_id(conn, name: str) -> int | None:
 
 
 def fetch_camera_hourly(conn, crossing_id: int) -> dict:
-    """hour_bucket (naive UTC) -> avg_duration_min"""
+    """
+    Estimates wait time from throughput: if X vehicles clear per hour,
+    and there are Y vehicles queued, wait ≈ Y/X * 60 minutes.
+    We approximate queue depth as a fraction of hourly throughput.
+    At Bogorodica with 5 lanes, peak ~685 veh/hr ≈ 137/lane/hr ≈ 2.3/lane/min.
+    A 10-minute wait implies ~23 vehicles ahead per lane.
+    """
+    LANES = 5  # Bogorodica has 5 lanes
+
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT
                 DATE_TRUNC('hour', entered_at) AS hour_bucket,
-                AVG(duration_sec) / 60.0       AS avg_duration_min,
-                COUNT(*)                        AS vehicle_count
+                COUNT(*)                        AS vehicles_per_hour
             FROM vehicle_crossings
             WHERE crossing_id = %s
-              AND exited_at IS NOT NULL
               AND duration_sec > 0
             GROUP BY 1
         """, (crossing_id,))
         return {
-            row["hour_bucket"]: {
-                "avg_min": float(row["avg_duration_min"]),
-                "count":   int(row["vehicle_count"]),
+            row["hour_bucket"].replace(tzinfo=timezone.utc): {
+                # vehicles/min per lane → wait for one vehicle = 1/(veh/min/lane)
+                "avg_min": 60.0 / (float(row["vehicles_per_hour"]) / LANES),
+                "count":   int(row["vehicles_per_hour"]),
             }
             for row in cur.fetchall()
         }
-
 
 def fetch_borderalarm_ok(conn, crossing_id: int) -> list[dict]:
     """Only quality_flag='ok' reports."""
@@ -183,9 +189,8 @@ def match_pairs(camera_hourly: dict, ba_reports: list[dict]) -> list[dict]:
 
         for delta_h in range(-MAX_HOUR_OFFSET, MAX_HOUR_OFFSET + 1):
             candidate      = bucket + timedelta(hours=delta_h)
-            candidate_naive = candidate.replace(tzinfo=None)
-            if candidate_naive in camera_hourly:
-                cam = camera_hourly[candidate_naive]
+            if candidate in camera_hourly:
+                cam = camera_hourly[candidate]
                 if cam["avg_min"] > 0 and (best_delta is None or
                                             abs(delta_h) < abs(best_delta)):
                     best       = cam
@@ -259,6 +264,29 @@ def compute_multiplier(pairs: list[dict]) -> dict:
         "notes":      notes,
     }
 
+
+def compute_multiplier_by_hour(pairs: list[dict]) -> dict:
+    """Group pairs into time buckets and compute per-bucket multipliers."""
+    buckets = {
+        "overnight": (0, 6),  # 00:00–05:59
+        "morning": (6, 12),  # 06:00–11:59
+        "afternoon": (12, 18),  # 12:00–17:59
+        "evening": (18, 24),  # 18:00–23:59
+    }
+
+    result = {}
+    for name, (h_start, h_end) in buckets.items():
+        bucket_pairs = [
+            p for p in pairs
+            if h_start <= p["reported_at"].hour < h_end
+        ]
+        if len(bucket_pairs) >= 2:
+            ratios = [p["ratio"] for p in bucket_pairs]
+            result[name] = round(float(np.median(ratios)), 3)
+        else:
+            result[name] = None  # fall back to global multiplier
+
+    return result
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
@@ -352,6 +380,13 @@ def main():
 
         pairs  = match_pairs(camera, ba_rpts)
         result = compute_multiplier(pairs)
+        hourly_result = compute_multiplier_by_hour(pairs)
+        print(f"\n  ── Time-of-day multipliers ─────────────────────────")
+        for bucket, val in hourly_result.items():
+            if val is not None:
+                print(f"  {bucket:<12} : {val}×")
+            else:
+                print(f"  {bucket:<12} : insufficient data (using global {result['multiplier']}×)")
 
         print_report(name, pairs, result)
 

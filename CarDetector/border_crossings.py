@@ -202,14 +202,6 @@ def save_snapshot(conn, crossing_name: str, lane_counts: dict,
 
 
 def save_vehicle_track(conn, crossing_name: str, track: dict) -> bool:
-    """
-    Persist a completed vehicle track to `vehicle_crossings`.
-    Returns True on success.
-
-    track keys:
-        track_id, vehicle_type, lane, entered_at, exited_at,
-        frame_count, confidence_sum, notes
-    """
     crossing_id = get_crossing_id(conn, crossing_name)
     if not crossing_id:
         return False
@@ -220,27 +212,32 @@ def save_vehicle_track(conn, crossing_name: str, track: dict) -> bool:
         if track["frame_count"] > 0 else None
     )
 
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO vehicle_crossings
-                (crossing_id, track_id, vehicle_type, lane,
-                 entered_at, exited_at, duration_sec,
-                 frame_count, avg_confidence, notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            crossing_id,
-            track["track_id"],
-            track["vehicle_type"],
-            track["lane"],
-            track["entered_at"],
-            track["exited_at"],
-            round(duration, 2),
-            track["frame_count"],
-            round(avg_conf, 3) if avg_conf else None,
-            track.get("notes"),
-        ))
-    conn.commit()
-    return True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO vehicle_crossings
+                    (crossing_id, track_id, vehicle_type, lane,
+                     entered_at, exited_at, duration_sec,
+                     frame_count, avg_confidence, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                crossing_id,
+                track["track_id"],
+                track["vehicle_type"],
+                track["lane"],
+                track["entered_at"],
+                track["exited_at"],
+                round(duration, 2),
+                track["frame_count"],
+                round(avg_conf, 3) if avg_conf else None,
+                track.get("notes"),
+            ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB ERROR] Failed to save track {track['track_id']}: {e}")
+        conn.rollback()   # <-- critical: without this, connection stays in error state
+        return False
 
 # ---------------------------------------------------------------------------
 # Geometry helpers

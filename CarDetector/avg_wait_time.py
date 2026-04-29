@@ -100,6 +100,7 @@ def fetch_recent_completed(conn, crossing_id: int,
               AND duration_sec IS NOT NULL
               AND duration_sec > 0
               AND exited_at > NOW() - INTERVAL '%s minutes'
+                AND lane IS NOT NULL
             ORDER BY exited_at DESC
         """, (crossing_id, window_min))
         return [dict(r) for r in cur.fetchall()]
@@ -363,6 +364,39 @@ def print_history(conn, crossing_id: int, crossing_name: str,
               f"{r['min_wait_min']:>5} m "
               f"{r['max_wait_min']:>5} m")
 
+
+def load_multiplier(conn, crossing_id: int) -> float:
+    """Get the best available multiplier for current hour."""
+    import json
+    with conn.cursor() as cur:
+        cur.execute("""
+                    SELECT multiplier, notes
+                    FROM crossing_queue_multipliers
+                    WHERE crossing_id = %s
+                    """, (crossing_id,))
+        row = cur.fetchone()
+    if not row:
+        return 1.0
+
+    multiplier, notes = row
+    tod = {}
+    if notes and "tod=" in notes:
+        try:
+            tod = json.loads(notes.split("tod=")[1])
+        except Exception:
+            pass
+
+    hour = datetime.now(timezone.utc).hour
+    if 0 <= hour < 6 and tod.get("overnight"):
+        return tod["overnight"]
+    elif 6 <= hour < 12 and tod.get("morning"):
+        return tod["morning"]
+    elif 12 <= hour < 18 and tod.get("afternoon"):
+        return tod["afternoon"]
+    elif 18 <= hour < 24 and tod.get("evening"):
+        return tod["evening"]
+    return float(multiplier)
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -403,6 +437,17 @@ def main():
         lanes     = fetch_lane_breakdown(conn, cid, window_min=args.window)
 
         result = estimate_wait(active, completed, baseline, window_min=args.window)
+
+        result = estimate_wait(active, completed, baseline, window_min=args.window)
+
+        if result["wait_minutes"] is not None:
+            m = load_multiplier(conn, cid)
+            result["wait_minutes"] = round(result["wait_minutes"] * m, 1)
+            if result["min_wait_minutes"]:
+                result["min_wait_minutes"] = round(result["min_wait_minutes"] * m, 1)
+            if result["max_wait_minutes"]:
+                result["max_wait_minutes"] = round(result["max_wait_minutes"] * m, 1)
+
         print_estimate(name, result, lanes, window_min=args.window)
 
     conn.close()
