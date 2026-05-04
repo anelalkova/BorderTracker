@@ -391,12 +391,16 @@ def main():
         print_report(name, pairs, result)
 
         if args.apply:
+            import json
+            tod = compute_multiplier_by_hour(pairs)
+            tod_clean = {k: v for k, v in tod.items() if v is not None}
+            notes = result["notes"] + f" tod={json.dumps(tod_clean)}"
             save_multiplier(
                 conn, cid,
                 multiplier=result["multiplier"],
                 confidence=result["confidence"],
                 pairs=result["pairs"],
-                notes=result["notes"],
+                notes=notes,
             )
             print(f"\n  ✓ Multiplier saved to DB.")
         else:

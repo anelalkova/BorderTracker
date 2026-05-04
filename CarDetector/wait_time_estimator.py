@@ -159,7 +159,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df["tracked_vehicles"] = df["tracked_vehicles"].fillna(0)
 
     # Sample size weight (more reports = more trustworthy label)
-    df["label_weight"] = np.log1p(df["ground_truth_sample_size"].fillna(1))
+    df["label_weight"] = np.log1p(df["ground_truth_sample_size"].fillna(1).astype(float))
 
     return df
 

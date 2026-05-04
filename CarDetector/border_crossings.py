@@ -508,17 +508,42 @@ def main():
 
         # ── Read frame ────────────────────────────────────────────────
         ret, frame = cap.read()
+        ret, frame = cap.read()
         if not ret or frame is None:
-            print("Stream lost. Reconnecting …")
             stream_ok = False
             cap.release()
-            time.sleep(2)
-            try:
-                cap       = open_stream(stream_url)
-                stream_ok = True
-            except RuntimeError as e:
-                print(f"Reconnect failed: {e}")
-                break
+            retry = 0
+            while True:
+                # Let the user quit even while reconnecting
+                key = cv2.waitKey(1) & 0xFF
+                if key in (ord('q'), 27):
+                    print("\nQuitting during reconnect …")
+                    conn.close()
+                    cv2.destroyAllWindows()
+                    sys.exit(0)
+
+                retry += 1
+                wait = min(2 ** retry, 60)  # exponential back-off, cap at 60 s
+                print(f"Stream lost. Reconnect attempt {retry} (waiting {wait}s) …")
+
+                # Show a "reconnecting" overlay so the window doesn't freeze
+                if last_frame is not None:
+                    disp = last_frame.copy()
+                else:
+                    disp = np.zeros((fh, fw, 3), dtype=np.uint8)
+                msg = f"Stream lost — reconnect attempt {retry} …  (Q to quit)"
+                cv2.putText(disp, msg, (20, fh // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 60, 255), 2, cv2.LINE_AA)
+                cv2.imshow(win_name, disp)
+
+                time.sleep(wait)
+                try:
+                    cap = open_stream(stream_url)
+                    stream_ok = True
+                    print(f"Reconnected after {retry} attempt(s).\n")
+                    break
+                except RuntimeError as e:
+                    print(f"  → Failed: {e}")
             continue
 
         stream_ok = True

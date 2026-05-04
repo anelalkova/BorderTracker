@@ -21,10 +21,11 @@ Usage:
     python borderalarm_filter.py --all
     python borderalarm_filter.py --crossing bogorodica --dry-run
     python borderalarm_filter.py --crossing bogorodica --show-stats
+    python borderalarm_filter.py --crossing bogorodica --force   # re-flag already-ok rows too
 """
 
 import argparse
-from datetime import timezone
+from datetime import timedelta, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -46,15 +47,8 @@ CROSSINGS = [
     "deve_bair", "kafasan", "medzitlija",
 ]
 
-# A crowdsourced report is suspect if claimed wait > this multiple
-# of the camera's observed avg duration for that hour
-MAX_RATIO = 3.0
-
-# Hard upper cap regardless of camera data (minutes)
-ABSOLUTE_MAX_MIN = 240
-
-# If camera avg is below this, don't use it for ratio filtering
-# (avoids flagging real jams when camera briefly sees 0 cars)
+MAX_RATIO            = 3.0
+ABSOLUTE_MAX_MIN     = 240
 MIN_CAMERA_DURATION_MIN = 2.0
 
 # ---------------------------------------------------------------------------
@@ -65,39 +59,65 @@ def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
 
-def ensure_quality_flag_column(conn):
-    """Add quality_flag column to crowdsourced_waits if missing."""
+def ensure_schema(conn):
+    """Add columns and indexes if missing. Safe to call every run."""
     with conn.cursor() as cur:
         cur.execute("""
             ALTER TABLE crowdsourced_waits
-            ADD COLUMN IF NOT EXISTS quality_flag TEXT DEFAULT NULL;
+                ADD COLUMN IF NOT EXISTS quality_flag   TEXT DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS camera_avg_min REAL DEFAULT NULL;
         """)
+        # Covering index so the hourly GROUP BY never full-scans
         cur.execute("""
-            ALTER TABLE crowdsourced_waits
-            ADD COLUMN IF NOT EXISTS camera_avg_min REAL DEFAULT NULL;
+            CREATE INDEX IF NOT EXISTS idx_vc_crossing_entered
+                ON vehicle_crossings (crossing_id, entered_at)
+                WHERE exited_at IS NOT NULL AND duration_sec > 0;
+        """)
+        # Speeds up the crowdsourced fetch
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cw_crossing_reported
+                ON crowdsourced_waits (crossing_id, reported_at);
         """)
     conn.commit()
 
 
-def get_crossing_id(conn, name: str) -> int | None:
+def get_all_crossing_ids(conn) -> dict[str, int]:
+    """Fetch all crossing name→id pairs in one query."""
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (name,))
-        row = cur.fetchone()
-        return row[0] if row else None
+        cur.execute("SELECT name, id FROM crossings")
+        return dict(cur.fetchall())
 
 
-def fetch_crowdsourced(conn, crossing_id: int) -> list[dict]:
+def fetch_crowdsourced(conn, crossing_id: int, force: bool = False) -> list[dict]:
+    """
+    Fetch reports that need (re-)classification.
+    Without --force, skip rows already marked 'ok' to avoid pointless work
+    on repeat runs.
+    """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("""
-            SELECT id, reported_at, wait_minutes, quality_flag
-            FROM crowdsourced_waits
-            WHERE crossing_id = %s
-            ORDER BY reported_at
-        """, (crossing_id,))
+        if force:
+            cur.execute("""
+                SELECT id, reported_at, wait_minutes, quality_flag
+                FROM crowdsourced_waits
+                WHERE crossing_id = %s
+                ORDER BY reported_at
+            """, (crossing_id,))
+        else:
+            cur.execute("""
+                SELECT id, reported_at, wait_minutes, quality_flag
+                FROM crowdsourced_waits
+                WHERE crossing_id = %s
+                  AND (quality_flag IS NULL OR quality_flag <> 'ok')
+                ORDER BY reported_at
+            """, (crossing_id,))
         return [dict(r) for r in cur.fetchall()]
 
 
 def fetch_camera_hourly(conn, crossing_id: int) -> dict:
+    """
+    Single aggregation query — the covering index makes this fast even on
+    large vehicle_crossings tables.
+    """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT
@@ -111,7 +131,6 @@ def fetch_camera_hourly(conn, crossing_id: int) -> dict:
             GROUP BY 1
         """, (crossing_id,))
         return {
-            # Keep as UTC-aware — don't strip tzinfo
             row["hour_bucket"].replace(tzinfo=timezone.utc): {
                 "avg_min": float(row["avg_duration_min"]),
                 "count":   int(row["vehicle_count"]),
@@ -119,10 +138,11 @@ def fetch_camera_hourly(conn, crossing_id: int) -> dict:
             for row in cur.fetchall()
         }
 
+
 def update_flags(conn, updates: list[dict], dry_run: bool):
-    """
-    updates: list of {id, quality_flag, camera_avg_min}
-    """
+    if not updates:
+        return
+
     if dry_run:
         for u in updates:
             print(f"  [DRY RUN] id={u['id']}  flag={u['quality_flag']}  "
@@ -131,43 +151,37 @@ def update_flags(conn, updates: list[dict], dry_run: bool):
 
     with conn.cursor() as cur:
         psycopg2.extras.execute_values(cur, """
-                                            UPDATE crowdsourced_waits AS cw
-                                            SET quality_flag   = v.quality_flag,
-                                                camera_avg_min = v.camera_avg_min::real
-                                            FROM (VALUES %s) AS v(id, quality_flag, camera_avg_min)
-                                            WHERE cw.id = v.id
-                                            """,
-                                       [(u["id"], u["quality_flag"], u.get("camera_avg_min")) for u in updates])
+            UPDATE crowdsourced_waits AS cw
+            SET quality_flag   = v.quality_flag,
+                camera_avg_min = v.camera_avg_min::real
+            FROM (VALUES %s) AS v(id, quality_flag, camera_avg_min)
+            WHERE cw.id = v.id::int
+        """, [(u["id"], u["quality_flag"], u.get("camera_avg_min")) for u in updates])
     conn.commit()
 
 # ---------------------------------------------------------------------------
 # Filtering logic
 # ---------------------------------------------------------------------------
 
+# Pre-built list of hour deltas to check: 0, -1, +1, -2, +2
+_HOUR_DELTAS = [timedelta(hours=d) for d in (0, -1, 1, -2, 2)]
+
+
 def classify_report(report: dict, camera_hourly: dict) -> tuple[str, float | None]:
-    """
-    Returns (quality_flag, camera_avg_min).
-    quality_flag: 'ok' | 'suspect_ratio' | 'suspect_absolute' | 'no_camera_data'
-    """
     wait = float(report["wait_minutes"])
 
-    # Hard cap first
     if wait > ABSOLUTE_MAX_MIN:
         return "suspect_absolute", None
 
-    # Find the matching camera hour bucket
-    # reported_at is UTC-aware; truncate to hour
     reported_at = report["reported_at"]
     if reported_at.tzinfo is None:
         reported_at = reported_at.replace(tzinfo=timezone.utc)
 
-    # Try exact hour match, then ±1 hour
     bucket = reported_at.replace(minute=0, second=0, microsecond=0)
+
     camera = None
-    for delta_h in [0, -1, 1, -2, 2]:
-        from datetime import timedelta
-        candidate = bucket + timedelta(hours=delta_h)
-        # Strip tzinfo for dict key comparison (stored as naive UTC from DB)
+    for delta in _HOUR_DELTAS:
+        candidate = bucket + delta
         if candidate in camera_hourly:
             camera = camera_hourly[candidate]
             break
@@ -176,8 +190,6 @@ def classify_report(report: dict, camera_hourly: dict) -> tuple[str, float | Non
         return "no_camera_data", None
 
     cam_avg = camera["avg_min"]
-
-    # Don't penalise based on very short camera durations
     if cam_avg < MIN_CAMERA_DURATION_MIN:
         return "ok", round(cam_avg, 1)
 
@@ -188,18 +200,15 @@ def classify_report(report: dict, camera_hourly: dict) -> tuple[str, float | Non
     return "ok", round(cam_avg, 1)
 
 
-def filter_crossing(conn, crossing_name: str,
-                    dry_run: bool = False, verbose: bool = True) -> dict:
-    cid = get_crossing_id(conn, crossing_name)
-    if not cid:
-        print(f"  Crossing '{crossing_name}' not found.")
-        return {}
+def filter_crossing(conn, crossing_name: str, crossing_id: int,
+                    dry_run: bool = False, force: bool = False,
+                    verbose: bool = True) -> dict:
 
-    reports      = fetch_crowdsourced(conn, cid)
-    camera_hourly = fetch_camera_hourly(conn, cid)
+    reports       = fetch_crowdsourced(conn, crossing_id, force=force)
+    camera_hourly = fetch_camera_hourly(conn, crossing_id)
 
     if not reports:
-        print(f"  No crowdsourced reports for '{crossing_name}'.")
+        print(f"  No unreviewed reports for '{crossing_name}'.")
         return {}
 
     updates = []
@@ -209,7 +218,8 @@ def filter_crossing(conn, crossing_name: str,
         flag, cam_avg = classify_report(r, camera_hourly)
         updates.append({"id": r["id"], "quality_flag": flag, "camera_avg_min": cam_avg})
 
-        bucket = "ok" if flag == "ok" else (
+        bucket = (
+            "ok"               if flag == "ok"               else
             "suspect_absolute" if flag == "suspect_absolute" else
             "no_camera_data"   if flag == "no_camera_data"   else
             "suspect_ratio"
@@ -217,7 +227,7 @@ def filter_crossing(conn, crossing_name: str,
         counts[bucket] += 1
 
         if verbose and flag != "ok":
-            ts = r["reported_at"].strftime("%Y-%m-%d %H:%M UTC")
+            ts      = r["reported_at"].strftime("%Y-%m-%d %H:%M UTC")
             cam_str = f"camera={cam_avg} min" if cam_avg else "no camera data"
             print(f"  ⚠  [{flag}]  {ts}  claimed={r['wait_minutes']} min  {cam_str}")
 
@@ -225,23 +235,19 @@ def filter_crossing(conn, crossing_name: str,
     return counts
 
 
-def show_stats(conn, crossing_name: str):
-    cid = get_crossing_id(conn, crossing_name)
-    if not cid:
-        return
-
+def show_stats(conn, crossing_id: int, crossing_name: str):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT
                 quality_flag,
-                COUNT(*)                              AS count,
-                ROUND(AVG(wait_minutes)::NUMERIC, 1) AS avg_wait,
+                COUNT(*)                               AS count,
+                ROUND(AVG(wait_minutes)::NUMERIC, 1)   AS avg_wait,
                 ROUND(AVG(camera_avg_min)::NUMERIC, 1) AS avg_camera
             FROM crowdsourced_waits
             WHERE crossing_id = %s
             GROUP BY quality_flag
             ORDER BY count DESC
-        """, (cid,))
+        """, (crossing_id,))
         rows = cur.fetchall()
 
     print(f"\n  Quality flag breakdown for {crossing_name}:")
@@ -259,10 +265,12 @@ def show_stats(conn, crossing_name: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Filter borderalarm crowdsourced reports")
-    parser.add_argument("--crossing", choices=CROSSINGS, default=None)
-    parser.add_argument("--all",      action="store_true")
-    parser.add_argument("--dry-run",  action="store_true")
+    parser.add_argument("--crossing",   choices=CROSSINGS, default=None)
+    parser.add_argument("--all",        action="store_true")
+    parser.add_argument("--dry-run",    action="store_true")
     parser.add_argument("--show-stats", action="store_true")
+    parser.add_argument("--force",      action="store_true",
+                        help="Re-classify rows already marked 'ok' (default: skip them)")
     args = parser.parse_args()
 
     if not args.crossing and not args.all:
@@ -271,17 +279,27 @@ def main():
     targets = CROSSINGS if args.all else [args.crossing]
     conn    = get_conn()
 
-    ensure_quality_flag_column(conn)
+    ensure_schema(conn)
+
+    # Fetch all crossing IDs in one query instead of one per crossing
+    crossing_ids = get_all_crossing_ids(conn)
 
     for name in targets:
+        cid = crossing_ids.get(name)
+        if not cid:
+            print(f"\n  Crossing '{name}' not found in DB — skipping.")
+            continue
+
         print(f"\n{'='*55}")
         print(f"  {name}")
         print(f"{'='*55}")
 
         if args.show_stats:
-            show_stats(conn, name)
+            show_stats(conn, cid, name)
         else:
-            counts = filter_crossing(conn, name, dry_run=args.dry_run)
+            counts = filter_crossing(conn, name, cid,
+                                     dry_run=args.dry_run,
+                                     force=args.force)
             if counts:
                 total = sum(counts.values())
                 print(f"\n  Results ({total} reports):")
