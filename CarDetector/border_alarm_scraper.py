@@ -55,6 +55,7 @@ BORDERALARM_SLUGS = {
     "tabanovce":   "tabanovce-presevo",
     "blace":       "blace-merdare",
     "medzitlija":  "medjitlija-niki",
+    "kafasan":     "kjafasan-qafe-thane",
     # deve_bair and kafasan may not have pages — add slugs if they do
 }
 
