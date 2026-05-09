@@ -1,0 +1,2 @@
+id,crossing_id,multiplier,confidence,matched_pairs,computed_at,notes
+1,5,1,low,2,2026-05-09 23:03:08.984941+02,"median_ratio=0.70, IQR=0.18, min=0.70, max=1.05, n=2 tod={""afternoon"": 0.875}"

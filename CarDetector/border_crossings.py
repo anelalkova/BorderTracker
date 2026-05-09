@@ -289,7 +289,6 @@ def open_stream(url: str) -> cv2.VideoCapture:
 # ---------------------------------------------------------------------------
 # Annotation
 # ---------------------------------------------------------------------------
-
 def annotate_frame(frame, detections, lane_counts, lanes_cfg,
                    active_vehicles, show_lanes, fps_display,
                    display_name, next_snap_in):
@@ -639,6 +638,7 @@ def main():
                 total_skipped += 1
                 continue
 
+
             track = {
                 "track_id":       tid,
                 "vehicle_type":   v["vehicle_type"],
@@ -685,6 +685,8 @@ def main():
         duration = (flush_dt - v["entered_at"]).total_seconds()
         if v["frame_count"] < MIN_FRAMES or duration > MAX_DURATION:
             continue
+
+
         save_vehicle_track(conn, args.crossing, {
             "track_id":       tid,
             "vehicle_type":   v["vehicle_type"],
