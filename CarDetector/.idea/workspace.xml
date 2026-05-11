@@ -2,18 +2,64 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="60e8bc67-93fc-46ae-8d7a-bdb608a30087" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/CarDetector.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CarDetector.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/data_source_mapping.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/sqldialects.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/avg_wait_time.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/border_data.sqlite" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l1_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l2_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l4_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l5_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/blace_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/blace_rf.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/bogorodica_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v3/blace_proc_time.joblib" beforeDir="false" afterPath="$PROJECT_DIR$/models_v3/blace_proc_time.joblib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/queue_depth_estimator.py" beforeDir="false" afterPath="$PROJECT_DIR$/queue_depth_estimator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/blace_20260421_184346.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/bogorodica_20260421_183932.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/deve_bair_20260421_184424.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_184449.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_195255.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200625.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200639.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200658.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200748.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200752.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201058.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201933.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_205142.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_160528.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_192841.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201258.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201300.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_202329.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_203539.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204343.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204350.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204558.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_205127.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_210925.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260507_231404.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260508_170955.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/medzitlija_20260421_184507.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/tabanovce_20260421_184318.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/wait_time_estimator.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/wait_time_model_v2.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />

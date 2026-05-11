@@ -12,8 +12,7 @@ adds ~3× the camera-visible portion.
 This multiplier is then used to scale up camera-based predictions
 to account for the full queue, not just the visible portion.
 
-The multiplier is stored per crossing in the DB and used by
-wait_time_from_crossings.py and wait_time_model_v2.py at prediction time.
+The multiplier is stored per crossing in the DB and used by wait_estimator_3.py at prediction time.
 
 It only uses borderalarm reports flagged as 'ok' by borderalarm_filter.py.
 Run borderalarm_filter.py first.
