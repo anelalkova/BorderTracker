@@ -100,11 +100,38 @@ def run_worker(crossing_names: list[str] | None, poll_seconds: int, run_once: bo
                         f"[ML] Failed snapshot {row['snapshot_id']} for "
                         f"{row['crossing_name']}: {exc}"
                     )
+                    # Insert a tombstone so this snapshot isn't retried forever
+                    _mark_snapshot_failed(conn, row["snapshot_id"], str(exc))
 
             if run_once:
                 return
+
+            time.sleep(poll_seconds)  # <-- was missing, hammers DB with no delay on success
     finally:
         conn.close()
+
+
+def _mark_snapshot_failed(conn, snapshot_id: int, reason: str) -> None:
+    """Insert a failed placeholder so the snapshot is excluded from future polling."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO wait_estimator_v3_results
+                    (crossing_id, snapshot_id, estimated_at, model_version, result_json)
+                SELECT
+                    s.crossing_id,
+                    s.id,
+                    s.captured_at,
+                    'failed',
+                    %s::jsonb
+                FROM snapshots s
+                WHERE s.id = %s
+                ON CONFLICT DO NOTHING
+            """, (psycopg2.extras.Json({"error": reason}), snapshot_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"[ML] Could not mark snapshot {snapshot_id} as failed: {e}")
 
 
 def parse_args():
