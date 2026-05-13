@@ -68,6 +68,7 @@ CREATE INDEX IF NOT EXISTS idx_vehicle_crossings_duration
 CREATE TABLE IF NOT EXISTS wait_time_estimates (
     id                     BIGSERIAL PRIMARY KEY,
     crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
+    snapshot_id            BIGINT      REFERENCES snapshots(id),
     estimated_at           TIMESTAMPTZ NOT NULL,
     estimated_wait_minutes REAL,
     confidence             REAL,
@@ -77,6 +78,24 @@ CREATE TABLE IF NOT EXISTS wait_time_estimates (
 
 CREATE INDEX IF NOT EXISTS idx_estimates_crossing_time
     ON wait_time_estimates (crossing_id, estimated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_estimates_snapshot_id
+    ON wait_time_estimates (snapshot_id);
+
+-- Dedicated wait_estimator_v3 output linked 1:1 with snapshots
+CREATE TABLE IF NOT EXISTS wait_estimator_v3_results (
+    id                     BIGSERIAL PRIMARY KEY,
+    crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
+    snapshot_id            BIGINT      NOT NULL UNIQUE REFERENCES snapshots(id),
+    estimated_at           TIMESTAMPTZ NOT NULL,
+    estimated_wait_minutes REAL,
+    confidence             REAL,
+    model_version          TEXT,
+    result_json            JSONB       NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_v3_results_crossing_time
+    ON wait_estimator_v3_results (crossing_id, estimated_at DESC);
 
 -- ── Crowdsourced wait times (from borderalarm.com or similar) ──
 
@@ -92,6 +111,16 @@ CREATE TABLE IF NOT EXISTS crowdsourced_waits (
 
 CREATE INDEX IF NOT EXISTS idx_crowdsourced_crossing_time
     ON crowdsourced_waits (crossing_id, reported_at DESC);
+
+-- ── Queue depth multipliers used by wait estimator v3 ─────────────────────
+
+CREATE TABLE IF NOT EXISTS crossing_queue_multipliers (
+    id          BIGSERIAL PRIMARY KEY,
+    crossing_id INTEGER NOT NULL UNIQUE REFERENCES crossings(id),
+    multiplier  REAL    NOT NULL,
+    notes       TEXT,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ── Views ─────────────────────────────────────────────────────
 

@@ -33,27 +33,34 @@ Controls:
 """
 
 import argparse
+import contextlib
+import os
 import sys
+import tempfile
 import time
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urljoin
 
 import cv2
 import numpy as np
 import psycopg2
 import psycopg2.extras
+import requests
 
 # ---------------------------------------------------------------------------
 # PostgreSQL connection config
 # ---------------------------------------------------------------------------
 DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "port":     int(os.getenv("DB_PORT", "5432")),
+    "dbname":   os.getenv("DB_NAME", "border_crossing"),
+    "user":     os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "postgres"),
 }
+
+WAIT_MODEL_DIR = Path(__file__).resolve().parent / "models_v3"
 
 STREAM_BASE = "https://streaming1.neotel.net.mk/stream/{name}.m3u8"
 
@@ -150,6 +157,50 @@ def init_db() -> psycopg2.extensions.connection:
                 VALUES (%s, %s, %s)
                 ON CONFLICT (name) DO NOTHING
             """, (name, cfg["display_name"], cfg["neighbor"]))
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS crossing_queue_multipliers (
+                id          BIGSERIAL PRIMARY KEY,
+                crossing_id INTEGER NOT NULL UNIQUE REFERENCES crossings(id),
+                multiplier  REAL    NOT NULL,
+                notes       TEXT,
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS wait_time_estimates (
+                id                     BIGSERIAL PRIMARY KEY,
+                crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
+                estimated_at           TIMESTAMPTZ NOT NULL,
+                estimated_wait_minutes REAL,
+                confidence             REAL,
+                model_version          TEXT,
+                context_json           JSONB
+            )
+        """)
+        cur.execute("""
+            ALTER TABLE wait_time_estimates
+            ADD COLUMN IF NOT EXISTS snapshot_id BIGINT REFERENCES snapshots(id)
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_estimates_snapshot_id
+            ON wait_time_estimates (snapshot_id)
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS wait_estimator_v3_results (
+                id                     BIGSERIAL PRIMARY KEY,
+                crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
+                snapshot_id            BIGINT      NOT NULL UNIQUE REFERENCES snapshots(id),
+                estimated_at           TIMESTAMPTZ NOT NULL,
+                estimated_wait_minutes REAL,
+                confidence             REAL,
+                model_version          TEXT,
+                result_json            JSONB       NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_v3_results_crossing_time
+            ON wait_estimator_v3_results (crossing_id, estimated_at DESC)
+        """)
     conn.commit()
     return conn
 
@@ -162,7 +213,7 @@ def get_crossing_id(conn, crossing_name: str) -> int | None:
 
 
 def save_snapshot(conn, crossing_name: str, lane_counts: dict,
-                  fps: float, interval_minutes: int, stream_ok: bool) -> int | None:
+                  fps: float, interval_minutes: int, stream_ok: bool) -> dict | None:
     if not stream_ok:
         print("[DB] Skipping snapshot — stream not live.")
         return None
@@ -185,6 +236,7 @@ def save_snapshot(conn, crossing_name: str, lane_counts: dict,
                  total_vehicles, cars, motorcycles, buses, trucks,
                  lane_breakdown, fps)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, captured_at
         """, (
             crossing_id,
             datetime.now(timezone.utc),
@@ -195,8 +247,13 @@ def save_snapshot(conn, crossing_name: str, lane_counts: dict,
             psycopg2.extras.Json(lane_counts),
             round(fps, 2),
         ))
+        snapshot_id, captured_at = cur.fetchone()
     conn.commit()
-    return grand_total
+    return {
+        "snapshot_id": int(snapshot_id),
+        "captured_at": captured_at,
+        "queue": grand_total,
+    }
 
 
 def save_vehicle_track(conn, crossing_name: str, track: dict) -> bool:
@@ -237,6 +294,7 @@ def save_vehicle_track(conn, crossing_name: str, track: dict) -> bool:
         conn.rollback()   # <-- critical: without this, connection stays in error state
         return False
 
+
 # ---------------------------------------------------------------------------
 # Geometry helpers
 # ---------------------------------------------------------------------------
@@ -272,17 +330,155 @@ def build_url(crossing_name: str) -> str:
     return STREAM_BASE.format(name=crossing_name)
 
 
-def open_stream(url: str) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(url)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10_000)
-    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC,  5_000)
-    if not cap.isOpened():
-        raise RuntimeError(
-            f"Could not open stream:\n  {url}\n"
-            "Check your internet connection or try the URL in VLC."
-        )
-    return cap
+@contextlib.contextmanager
+def no_proxy_env():
+    names = [
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+        "http_proxy", "https_proxy", "all_proxy",
+        "GIT_HTTP_PROXY", "GIT_HTTPS_PROXY",
+    ]
+    saved = {name: os.environ.get(name) for name in names}
+    for name in names:
+        os.environ.pop(name, None)
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is not None:
+                os.environ[name] = value
+
+
+class SegmentPollingCapture:
+    """
+    Fallback capture for HLS streams when OpenCV/FFmpeg cannot open the HTTPS
+    manifest directly. It polls the playlist, downloads the next TS segment
+    locally, and lets OpenCV decode that local file.
+    """
+    def __init__(self, playlist_url: str):
+        self.playlist_url = playlist_url
+        self.session = requests.Session()
+        self.session.trust_env = False
+        self.cap = None
+        self.temp_path = None
+        self.current_segment = None
+        self.opened = self._open_next_segment(initial=True)
+
+    def isOpened(self):
+        return self.opened
+
+    def release(self):
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
+        if self.temp_path and os.path.exists(self.temp_path):
+            try:
+                os.unlink(self.temp_path)
+            except OSError:
+                pass
+            self.temp_path = None
+
+    def set(self, *_args, **_kwargs):
+        return False
+
+    def get(self, prop_id):
+        if self.cap is None:
+            return 0
+        return self.cap.get(prop_id)
+
+    def read(self):
+        while True:
+            if self.cap is None:
+                if not self._open_next_segment():
+                    return False, None
+
+            ret, frame = self.cap.read()
+            if ret and frame is not None:
+                return True, frame
+
+            self.release()
+            self.cap = None
+            time.sleep(0.2)
+
+    def _fetch_segment_candidates(self):
+        response = self.session.get(self.playlist_url, timeout=10)
+        response.raise_for_status()
+        lines = [
+            line.strip()
+            for line in response.text.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        return [urljoin(self.playlist_url, line) for line in lines]
+
+    def _open_next_segment(self, initial: bool = False):
+        attempts = 0
+        while attempts < 4:
+            attempts += 1
+            try:
+                candidates = self._fetch_segment_candidates()
+            except Exception:
+                time.sleep(1)
+                continue
+
+            if not candidates:
+                time.sleep(1)
+                continue
+
+            ordered = list(reversed(candidates))
+            if self.current_segment:
+                ordered = [u for u in ordered if u != self.current_segment] + [self.current_segment]
+
+            for seg_url in ordered:
+                try:
+                    data = self.session.get(seg_url, timeout=15).content
+                except Exception:
+                    continue
+                if len(data) < 1024:
+                    continue
+
+                self.release()
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ts")
+                tmp.write(data)
+                tmp.close()
+                self.temp_path = tmp.name
+
+                cap = cv2.VideoCapture(self.temp_path)
+                if cap.isOpened():
+                    ret, frame = cap.read()
+                    if ret and frame is not None:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        self.cap = cap
+                        self.current_segment = seg_url
+                        return True
+                cap.release()
+                if self.temp_path and os.path.exists(self.temp_path):
+                    os.unlink(self.temp_path)
+                    self.temp_path = None
+
+            if initial:
+                time.sleep(1)
+
+        return False
+
+
+def open_stream(url: str):
+    with no_proxy_env():
+        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10_000)
+        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5_000)
+        if cap.isOpened():
+            return cap
+        cap.release()
+
+        fallback = SegmentPollingCapture(url)
+        if fallback.isOpened():
+            print("[STREAM] Using TS segment polling fallback.")
+            return fallback
+
+    raise RuntimeError(
+        f"Could not open stream:\n  {url}\n"
+        "Check your internet connection or try the URL in VLC."
+    )
 
 # ---------------------------------------------------------------------------
 # Annotation
@@ -467,10 +663,10 @@ def main():
                 cv2.imwrite(str(spath), last_frame)
                 print(f"Screenshot saved → {spath}")
         elif key == ord('d'):
-            n = save_snapshot(conn, args.crossing, last_lane_counts,
+            snap = save_snapshot(conn, args.crossing, last_lane_counts,
                               fps_display, args.interval, stream_ok)
             last_snap_t = time.time()
-            print(f"[DB] Manual snapshot saved  (queue={n})")
+            print(f"[DB] Manual snapshot saved  (queue={snap['queue'] if snap else None})")
         elif key == ord('t'):
             print(f"\n[TRACKS] Active: {len(active_vehicles)}  "
                   f"Saved: {total_saved}  Skipped: {total_skipped}")
@@ -484,12 +680,12 @@ def main():
         # ── Periodic auto-snapshot ─────────────────────────────────────
         now = time.time()
         if not paused and (now - last_snap_t) >= interval_sec:
-            n = save_snapshot(conn, args.crossing, last_lane_counts,
+            snap = save_snapshot(conn, args.crossing, last_lane_counts,
                               fps_display, args.interval, stream_ok)
             last_snap_t = now
-            if n is not None:
+            if snap is not None:
                 ts = datetime.now().strftime("%H:%M:%S")
-                print(f"[DB] {ts}  Snapshot  crossing={args.crossing}  queue={n}"
+                print(f"[DB] {ts}  Snapshot  crossing={args.crossing}  queue={snap['queue']}"
                       f"  active_tracks={len(active_vehicles)}")
 
         next_snap_in = max(0, int(interval_sec - (time.time() - last_snap_t)))
