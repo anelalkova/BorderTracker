@@ -9,8 +9,87 @@ CREATE TABLE IF NOT EXISTS crossings (
     id           SERIAL PRIMARY KEY,
     name         TEXT   NOT NULL UNIQUE,
     display_name TEXT   NOT NULL,
-    neighbor     TEXT   NOT NULL
+    neighbor     TEXT   NOT NULL,
+    borderalarm_slug TEXT,
+    lane_config  JSONB  NOT NULL DEFAULT '{}'::jsonb
 );
+
+ALTER TABLE crossings
+    ADD COLUMN IF NOT EXISTS borderalarm_slug TEXT,
+    ADD COLUMN IF NOT EXISTS lane_config JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+INSERT INTO crossings (name, display_name, neighbor, borderalarm_slug, lane_config)
+VALUES
+    (
+        'bogorodica',
+        'Bogorodica (МК–ГР)',
+        'Greece',
+        'bogorodica-evzoni',
+        $${
+          "Bogorodica L1": [[0.32, 0.12], [0.39, 0.14], [0.00, 0.53], [0.00, 0.25]],
+          "Bogorodica L2": [[0.39, 0.16], [0.43, 0.16], [0.05, 0.94], [0.00, 0.68]],
+          "Bogorodica L3": [[0.43, 0.16], [0.46, 0.16], [0.26, 0.94], [0.05, 0.94]],
+          "Bogorodica L4": [[0.50, 0.16], [0.54, 0.16], [0.93, 0.94], [0.73, 0.94]],
+          "Bogorodica L5": [[0.54, 0.16], [0.59, 0.16], [1.00, 0.70], [0.93, 0.94]]
+        }$$::jsonb
+    ),
+    (
+        'blace',
+        'Blace (МК–КС)',
+        'Kosovo',
+        'blace-merdare',
+        $${
+          "Blace L1": [[0.480, 0.135], [0.435, 0.211], [0.368, 0.343], [0.308, 0.474], [0.250, 0.625], [0.196, 0.769], [0.140, 0.918], [0.117, 0.993], [0.003, 0.997], [0.000, 0.720], [0.100, 0.542], [0.193, 0.394], [0.264, 0.301], [0.347, 0.214], [0.438, 0.123]],
+          "Blace L2": [[0.488, 0.133], [0.519, 0.135], [0.523, 0.207], [0.551, 0.510], [0.573, 0.745], [0.596, 0.993], [0.204, 0.992], [0.270, 0.731], [0.345, 0.483], [0.410, 0.291], [0.458, 0.185]],
+          "Blace L3": [[0.579, 0.132], [0.910, 0.995], [0.625, 0.989], [0.548, 0.263], [0.536, 0.137]]
+        }$$::jsonb
+    ),
+    (
+        'tabanovce',
+        'Tabanovce (МК–СР)',
+        'Serbia',
+        'tabanovce-presevo',
+        $${
+          "Tabanovce L1": [[0.516, 0.177], [0.494, 0.137], [0.356, 0.161], [0.217, 0.215], [0.006, 0.389], [0.003, 0.641], [0.203, 0.384], [0.311, 0.297]],
+          "Tabanovce L2": [[0.003, 0.684], [0.233, 0.416], [0.346, 0.324], [0.377, 0.309], [0.414, 0.368], [0.308, 0.523], [0.221, 0.666], [0.084, 0.995], [0.001, 0.991]],
+          "Tabanovce L3": [[0.145, 0.993], [0.421, 0.997], [0.490, 0.368], [0.415, 0.376], [0.353, 0.449]]
+        }$$::jsonb
+    ),
+    (
+        'deve_bair',
+        'Deve Bair (МК–БГ)',
+        'Bulgaria',
+        NULL,
+        $${
+          "DeveBair L1": [[0.406, 0.168], [0.396, 0.234], [0.345, 0.340], [0.062, 0.992], [0.423, 0.996], [0.494, 0.353], [0.507, 0.168]],
+          "DeveBair L2": [[0.573, 0.179], [0.578, 0.342], [0.645, 0.996], [0.995, 0.994], [0.997, 0.658], [0.840, 0.360], [0.814, 0.290], [0.782, 0.170]]
+        }$$::jsonb
+    ),
+    (
+        'kafasan',
+        'Kafasan (МК–АЛ)',
+        'Albania',
+        'kjafasan-qafe-thane',
+        $${
+          "Kafasan L1": [[0.511, 0.243], [0.508, 0.341], [0.233, 0.994], [0.006, 0.994], [0.004, 0.716], [0.414, 0.246]],
+          "Kafasan L2": [[0.519, 0.243], [0.523, 0.338], [0.557, 0.516], [0.612, 0.670], [0.740, 0.997], [0.998, 0.996], [0.991, 0.706], [0.602, 0.244]]
+        }$$::jsonb
+    ),
+    (
+        'medzitlija',
+        'Megjitlija (МК–ГР)',
+        'Greece',
+        'medjitlija-niki',
+        $${
+          "Medzitlija L1": [[0.366, 0.220], [0.002, 0.506], [0.000, 0.332], [0.236, 0.222], [0.333, 0.193]],
+          "Medzitlija L2": [[-0.001, 0.533], [0.723, 0.262], [0.956, 0.345], [0.995, 0.547], [0.999, 0.995], [0.000, 0.995]]
+        }$$::jsonb
+    )
+ON CONFLICT (name) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    neighbor = EXCLUDED.neighbor,
+    borderalarm_slug = EXCLUDED.borderalarm_slug,
+    lane_config = EXCLUDED.lane_config;
 
 -- ── Raw vehicle count snapshots (periodic overview) ──────────
 
@@ -262,11 +341,3 @@ WHERE csh.avg_wait_minutes IS NOT NULL;  -- only rows with ground truth labels
 
 -- ── Seed crossings ────────────────────────────────────────────
 
-INSERT INTO crossings (name, display_name, neighbor) VALUES
-    ('bogorodica', 'Bogorodica (МК–ГР)', 'Greece'),
-    ('blace',      'Blace (МК–КС)',      'Kosovo'),
-    ('tabanovce',  'Tabanovce (МК–СР)',  'Serbia'),
-    ('deve_bair',  'Deve Bair (МК–БГ)', 'Bulgaria'),
-    ('kafasan',    'Kafasan (МК–АЛ)',    'Albania'),
-    ('medzitlija', 'Megjitlija (МК–ГР)', 'Greece')
-ON CONFLICT (name) DO NOTHING;

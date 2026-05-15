@@ -48,21 +48,10 @@ import numpy as np
 import psycopg2
 import psycopg2.extras
 import requests
-
-# ---------------------------------------------------------------------------
-# PostgreSQL connection config
-# ---------------------------------------------------------------------------
-DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5432")),
-    "dbname":   os.getenv("DB_NAME", "border_crossing"),
-    "user":     os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "postgres"),
-}
+from config import DB_CONFIG, DEFAULT_SNAPSHOT_INTERVAL_MIN, STREAM_BASE_URL
+from crossings_db import ensure_schema, get_crossing_id, load_crossings
 
 WAIT_MODEL_DIR = Path(__file__).resolve().parent / "models_v3"
-
-STREAM_BASE = "https://streaming1.neotel.net.mk/stream/{name}.m3u8"
 
 VEHICLE_CLASSES = {
     2: "car",
@@ -80,62 +69,6 @@ LANE_COLORS = [
     (255,  50, 150),
 ]
 
-CROSSINGS = {
-    "bogorodica": {
-        "display_name": "Bogorodica (МК–ГР)",
-        "neighbor": "Greece",
-        "lanes": {
-            "Bogorodica L1": [(0.32, 0.12), (0.39, 0.14), (0.00, 0.53), (0.00, 0.25)],
-            "Bogorodica L2": [(0.39, 0.16), (0.43, 0.16), (0.05, 0.94), (0.00, 0.68)],
-            "Bogorodica L3": [(0.43, 0.16), (0.46, 0.16), (0.26, 0.94), (0.05, 0.94)],
-            "Bogorodica L4": [(0.50, 0.16), (0.54, 0.16), (0.93, 0.94), (0.73, 0.94)],
-            "Bogorodica L5": [(0.54, 0.16), (0.59, 0.16), (1.00, 0.7), (0.93, 0.94)],
-        },
-    },
-    "blace": {
-        "display_name": "Blace (МК–КС)",
-        "neighbor": "Kosovo",
-        "lanes": {
-            "Blace L1": [(0.480, 0.135), (0.435, 0.211), (0.368, 0.343), (0.308, 0.474), (0.250, 0.625), (0.196, 0.769), (0.140, 0.918), (0.117, 0.993), (0.003, 0.997), (0.000, 0.720), (0.100, 0.542), (0.193, 0.394), (0.264, 0.301), (0.347, 0.214), (0.438, 0.123)],
-            "Blace L2": [(0.488, 0.133), (0.519, 0.135), (0.523, 0.207), (0.551, 0.510), (0.573, 0.745), (0.596, 0.993), (0.204, 0.992), (0.270, 0.731), (0.345, 0.483), (0.410, 0.291), (0.458, 0.185)],
-            "Blace L3": [(0.579, 0.132), (0.910, 0.995), (0.625, 0.989), (0.548, 0.263), (0.536, 0.137)]
-        },
-    },
-    "tabanovce": {
-        "display_name": "Tabanovce (МК–СР)",
-        "neighbor": "Serbia",
-        "lanes": {
-            "Tabanovce L1": [(0.516, 0.177), (0.494, 0.137), (0.356, 0.161), (0.217, 0.215), (0.006, 0.389), (0.003, 0.641), (0.203, 0.384), (0.311, 0.297)],
-            "Tabanovce L2": [(0.003, 0.684), (0.233, 0.416), (0.346, 0.324), (0.377, 0.309), (0.414, 0.368), (0.308, 0.523), (0.221, 0.666), (0.084, 0.995), (0.001, 0.991)],
-            "Tabanovce L3": [(0.145, 0.993), (0.421, 0.997), (0.490, 0.368), (0.415, 0.376), (0.353, 0.449)]
-        },
-    },
-    "deve_bair": {
-        "display_name": "Deve Bair (МК–БГ)",
-        "neighbor": "Bulgaria",
-        "lanes": {
-            "DeveBair L1": [(0.406, 0.168), (0.396, 0.234), (0.345, 0.340), (0.062, 0.992), (0.423, 0.996), (0.494, 0.353), (0.507, 0.168)],
-            "DeveBair L2": [(0.573, 0.179), (0.578, 0.342), (0.645, 0.996), (0.995, 0.994), (0.997, 0.658), (0.840, 0.360), (0.814, 0.290), (0.782, 0.170)],
-        },
-    },
-    "kafasan": {
-        "display_name": "Kafasan (МК–АЛ)",
-        "neighbor": "Albania",
-        "lanes": {
-            "Kafasan L1": [(0.511, 0.243), (0.508, 0.341), (0.233, 0.994), (0.006, 0.994), (0.004, 0.716), (0.414, 0.246)],
-            "Kafasan L2": [(0.519, 0.243), (0.523, 0.338), (0.557, 0.516), (0.612, 0.670), (0.740, 0.997), (0.998, 0.996), (0.991, 0.706), (0.602, 0.244)],
-        },
-    },
-    "medzitlija": {
-        "display_name": "Megjitlija (МК–ГР)",
-        "neighbor": "Greece",
-        "lanes": {
-            "Medzitlija L1": [(0.366, 0.220), (0.002, 0.506), (0.000, 0.332), (0.236, 0.222), (0.333, 0.193)],
-            "Medzitlija L2": [(-0.001, 0.533), (0.723, 0.262), (0.956, 0.345), (0.995, 0.547), (0.999, 0.995), (0.000, 0.995)],
-        },
-    },
-}
-
 # ---------------------------------------------------------------------------
 # Minimum frames a vehicle must be tracked before we save it.
 # At ~10fps, 15 frames = ~1.5 seconds — filters out false positives.
@@ -150,66 +83,8 @@ MAX_DURATION = 7200
 
 def init_db() -> psycopg2.extensions.connection:
     conn = psycopg2.connect(**DB_CONFIG)
-    with conn.cursor() as cur:
-        for name, cfg in CROSSINGS.items():
-            cur.execute("""
-                INSERT INTO crossings (name, display_name, neighbor)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (name) DO NOTHING
-            """, (name, cfg["display_name"], cfg["neighbor"]))
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS crossing_queue_multipliers (
-                id          BIGSERIAL PRIMARY KEY,
-                crossing_id INTEGER NOT NULL UNIQUE REFERENCES crossings(id),
-                multiplier  REAL    NOT NULL,
-                notes       TEXT,
-                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS wait_time_estimates (
-                id                     BIGSERIAL PRIMARY KEY,
-                crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
-                estimated_at           TIMESTAMPTZ NOT NULL,
-                estimated_wait_minutes REAL,
-                confidence             REAL,
-                model_version          TEXT,
-                context_json           JSONB
-            )
-        """)
-        cur.execute("""
-            ALTER TABLE wait_time_estimates
-            ADD COLUMN IF NOT EXISTS snapshot_id BIGINT REFERENCES snapshots(id)
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_estimates_snapshot_id
-            ON wait_time_estimates (snapshot_id)
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS wait_estimator_v3_results (
-                id                     BIGSERIAL PRIMARY KEY,
-                crossing_id            INTEGER     NOT NULL REFERENCES crossings(id),
-                snapshot_id            BIGINT      NOT NULL UNIQUE REFERENCES snapshots(id),
-                estimated_at           TIMESTAMPTZ NOT NULL,
-                estimated_wait_minutes REAL,
-                confidence             REAL,
-                model_version          TEXT,
-                result_json            JSONB       NOT NULL
-            )
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_v3_results_crossing_time
-            ON wait_estimator_v3_results (crossing_id, estimated_at DESC)
-        """)
-    conn.commit()
+    ensure_schema(conn)
     return conn
-
-
-def get_crossing_id(conn, crossing_name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (crossing_name,))
-        row = cur.fetchone()
-        return row[0] if row else None
 
 
 def save_snapshot(conn, crossing_name: str, lane_counts: dict,
@@ -327,7 +202,12 @@ def find_lane(cx_f: float, cy_f: float, lanes_cfg: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 def build_url(crossing_name: str) -> str:
-    return STREAM_BASE.format(name=crossing_name)
+    return STREAM_BASE_URL.format(name=crossing_name)
+
+
+def console_text(value: str) -> str:
+    encoding = sys.stdout.encoding or "utf-8"
+    return value.encode(encoding, errors="replace").decode(encoding)
 
 
 @contextlib.contextmanager
@@ -538,34 +418,48 @@ def annotate_frame(frame, detections, lane_counts, lanes_cfg,
 
 def main():
     parser = argparse.ArgumentParser(description="Macedonia border crossing — per-vehicle tracker")
-    parser.add_argument("--crossing",  default="bogorodica",
-                        choices=list(CROSSINGS.keys()))
+    parser.add_argument("--crossing",  default="bogorodica")
     parser.add_argument("--list",      action="store_true")
     parser.add_argument("--url",       default=None)
     parser.add_argument("--model",     default="yolov8m",
                         help="yolov8n / yolov8s / yolov8m / yolov8l / yolov8x  (default: m)")
     parser.add_argument("--conf",      type=float, default=0.30,
                         help="YOLO confidence threshold — lower catches more at frame edges")
-    parser.add_argument("--interval",  type=int,   default=5,
+    parser.add_argument("--interval",  type=int,   default=DEFAULT_SNAPSHOT_INTERVAL_MIN,
                         help="Snapshot DB interval in minutes")
     parser.add_argument("--save",      action="store_true")
     parser.add_argument("--calibrate", action="store_true")
     args = parser.parse_args()
 
     if args.list:
+        try:
+            conn = init_db()
+        except Exception as e:
+            print(f"DB connection failed: {e}")
+            sys.exit(1)
         print("\nAvailable border crossings:")
-        for k, v in CROSSINGS.items():
-            print(f"  {k:<15} {v['display_name']}")
+        for name, cfg in load_crossings(conn).items():
+            print(f"  {name:<15} {console_text(cfg['display_name'])}")
         print()
+        conn.close()
         return
 
-    cfg          = CROSSINGS[args.crossing]
+    preload_conn = init_db()
+    try:
+        cfg = load_crossings(preload_conn).get(args.crossing)
+    finally:
+        preload_conn.close()
+
+    if not cfg:
+        print(f"Unknown crossing '{args.crossing}'. Use --list to see available crossings.")
+        sys.exit(1)
+
     display_name = cfg["display_name"]
-    lanes_cfg    = cfg["lanes"]
-    stream_url   = args.url or build_url(args.crossing)
+    lanes_cfg = cfg["lane_config"]
+    stream_url = args.url or build_url(args.crossing)
 
     print(f"\n{'='*65}")
-    print(f"  Crossing  : {display_name}")
+    print(f"  Crossing  : {console_text(display_name)}")
     print(f"  Stream    : {stream_url}")
     print(f"  DB        : {DB_CONFIG['dbname']} on {DB_CONFIG['host']}")
     print(f"  Model     : {args.model}  (conf ≥ {args.conf})")
@@ -580,6 +474,16 @@ def main():
         print(f"DB connection failed: {e}")
         sys.exit(1)
 
+    crossings = load_crossings(conn)
+    cfg_db = crossings.get(args.crossing)
+    if cfg_db:
+        display_name = cfg_db["display_name"]
+        lanes_cfg = cfg_db["lane_config"]
+    else:
+        print(f"Crossing '{args.crossing}' was not found in the database metadata.")
+        conn.close()
+        sys.exit(1)
+
     # ── YOLO ──────────────────────────────────────────────────────────────
     try:
         from ultralytics import YOLO
@@ -588,9 +492,9 @@ def main():
         sys.exit(1)
 
     model_name = args.model if args.model.endswith(".pt") else f"{args.model}.pt"
-    print(f"Loading {model_name} …")
+    print(f"Loading {model_name}...")
     model = YOLO(model_name)
-    print("Model ready. Connecting to stream …\n")
+    print("Model ready. Connecting to stream ...\n")
 
     # ── Open stream ───────────────────────────────────────────────────────
     try:
@@ -609,7 +513,7 @@ def main():
             str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (fw, fh))
         print(f"Recording → {out_path}")
 
-    win_name = f"MK Border – {display_name}"
+    win_name = console_text(f"MK Border - {display_name}")
     cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(win_name, min(fw, 1280), min(fh, 720))
 

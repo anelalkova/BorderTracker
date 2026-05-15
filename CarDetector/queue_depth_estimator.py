@@ -32,23 +32,12 @@ from datetime import datetime, timezone, timedelta
 import numpy as np
 import psycopg2
 import psycopg2.extras
+from config import DB_CONFIG
+from crossings_db import get_crossing_id, get_lane_count, load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
 
 # Maximum hour offset when matching borderalarm report to camera hour
 MAX_HOUR_OFFSET = 1
@@ -85,13 +74,6 @@ def ensure_multiplier_table(conn):
     conn.commit()
 
 
-def get_crossing_id(conn, name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (name,))
-        row = cur.fetchone()
-        return row[0] if row else None
-
-
 def fetch_camera_hourly(conn, crossing_id: int) -> dict:
     """
     Estimates wait time from throughput: if X vehicles clear per hour,
@@ -100,7 +82,7 @@ def fetch_camera_hourly(conn, crossing_id: int) -> dict:
     At Bogorodica with 5 lanes, peak ~685 veh/hr ≈ 137/lane/hr ≈ 2.3/lane/min.
     A 10-minute wait implies ~23 vehicles ahead per lane.
     """
-    LANES = 5  # Bogorodica has 5 lanes
+    lane_count = max(get_lane_count(conn, crossing_id), 1)
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
@@ -115,7 +97,7 @@ def fetch_camera_hourly(conn, crossing_id: int) -> dict:
         return {
             row["hour_bucket"].replace(tzinfo=timezone.utc): {
                 # vehicles/min per lane → wait for one vehicle = 1/(veh/min/lane)
-                "avg_min": 60.0 / (float(row["vehicles_per_hour"]) / LANES),
+                "avg_min": 60.0 / (float(row["vehicles_per_hour"]) / lane_count),
                 "count":   int(row["vehicles_per_hour"]),
             }
             for row in cur.fetchall()
@@ -341,7 +323,7 @@ def show_current(conn, crossing_name: str, crossing_id: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Queue depth multiplier estimator")
-    parser.add_argument("--crossing", choices=CROSSINGS, default=None)
+    parser.add_argument("--crossing", default=None)
     parser.add_argument("--all",      action="store_true")
     parser.add_argument("--apply",    action="store_true",
                         help="Save multiplier to DB (default: just print)")
@@ -352,8 +334,12 @@ def main():
     if not args.crossing and not args.all:
         parser.error("Specify --crossing <n> or --all")
 
-    targets = CROSSINGS if args.all else [args.crossing]
     conn    = get_conn()
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all else [args.crossing]
     ensure_multiplier_table(conn)
 
     for name in targets:

@@ -46,25 +46,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
+from config import DB_CONFIG, build_sqlalchemy_url
+from crossings_db import get_crossing_id, load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
-MODEL_DIR = Path("models_v2")
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
+MODEL_DIR = Path(__file__).resolve().parent / "models_v2"
 
 # Weight given to borderalarm 'ok' reports relative to camera rows
 BORDERALARM_BLEND_WEIGHT = 0.3
@@ -81,19 +70,7 @@ def get_conn():
 
 
 def get_engine():
-    c = DB_CONFIG
-    url = (
-        f"postgresql+psycopg2://{c['user']}:{c['password']}"
-        f"@{c['host']}:{c['port']}/{c['dbname']}"
-    )
-    return create_engine(url)
-
-
-def get_crossing_id(conn, name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (name,))
-        row = cur.fetchone()
-        return row[0] if row else None
+    return create_engine(build_sqlalchemy_url())
 
 
 # ---------------------------------------------------------------------------
@@ -583,6 +560,83 @@ def predict_now(conn, crossing_id: int, model_path: Path) -> dict:
     }
 
 
+def summarize_crossing_wait_minutes(result: dict) -> float | None:
+    """
+    Reduce per-lane wait predictions to one crossing-level value for storage in
+    wait_time_estimates. We use the slowest active lane as the top-level wait.
+    """
+    lane_results = result.get("lanes", {})
+    lane_waits = [
+        float(lane_data.get("wait_minutes", 0))
+        for lane_data in lane_results.values()
+        if lane_data.get("queue_size", 0) > 0
+    ]
+    if not lane_waits:
+        return 0.0
+    return round(max(lane_waits), 1)
+
+
+def save_wait_estimate(conn, crossing_id: int, result: dict, model_path: Path) -> int:
+    """
+    Persist the latest prediction to wait_time_estimates while keeping the
+    richer per-lane output in context_json.
+    """
+    estimated_wait = summarize_crossing_wait_minutes(result)
+    snapshot_at = result.get("snapshot_at")
+
+    if isinstance(snapshot_at, str):
+        try:
+            estimated_at = datetime.fromisoformat(snapshot_at)
+        except ValueError:
+            estimated_at = datetime.now(timezone.utc)
+    else:
+        estimated_at = snapshot_at or datetime.now(timezone.utc)
+
+    context = {
+        "lanes": result.get("lanes", {}),
+        "total_vehicles": result.get("total_vehicles", 0),
+        "snapshot_at": result.get("snapshot_at"),
+        "model_type": result.get("model_type"),
+        "trained_at": result.get("trained_at"),
+        "n_train": result.get("n_train"),
+        "summary_method": "max_lane_wait",
+    }
+
+    model_version = f"{result.get('model_type', 'unknown')}:{model_path.name}"
+    confidence = None
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO wait_time_estimates
+                (crossing_id, estimated_at, estimated_wait_minutes,
+                 confidence, model_version, context_json)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            crossing_id,
+            estimated_at,
+            estimated_wait,
+            confidence,
+            model_version,
+            psycopg2.extras.Json(context),
+        ))
+        estimate_id = cur.fetchone()[0]
+    conn.commit()
+    return estimate_id
+
+
+def predict_and_save_latest(conn, crossing_id: int, model_path: Path) -> dict:
+    """
+    Run a live prediction from the latest snapshot and persist the result to
+    wait_time_estimates.
+    """
+    result = predict_now(conn, crossing_id, model_path)
+    estimate_id = save_wait_estimate(conn, crossing_id, result, model_path)
+    result["estimate_id"] = estimate_id
+    result["estimated_wait_minutes"] = summarize_crossing_wait_minutes(result)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Feature importance
 # ---------------------------------------------------------------------------
@@ -617,7 +671,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Wait time model v2 — per-lane, camera-first"
     )
-    parser.add_argument("--crossing",           choices=CROSSINGS, default=None)
+    parser.add_argument("--crossing",           default=None)
     parser.add_argument("--all-crossings",      action="store_true")
     parser.add_argument("--train",              action="store_true")
     parser.add_argument("--predict",            action="store_true")
@@ -630,9 +684,13 @@ def main():
     if not args.crossing and not args.all_crossings:
         parser.error("Specify --crossing <name> or --all-crossings")
 
-    targets = CROSSINGS if args.all_crossings else [args.crossing]
     conn    = get_conn()
     engine  = get_engine()
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all_crossings else [args.crossing]
 
     for name in targets:
         print(f"\n{'='*55}")

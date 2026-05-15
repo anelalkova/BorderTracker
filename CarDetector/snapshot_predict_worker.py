@@ -17,15 +17,9 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
-from border_crossings import CROSSINGS, WAIT_MODEL_DIR, init_db
+from border_crossings import WAIT_MODEL_DIR, init_db
+from crossings_db import get_crossing_id, load_crossing_names
 from wait_estimator_v3 import estimate_and_save_v3_result
-
-
-def get_crossing_id(conn, name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (name,))
-        row = cur.fetchone()
-        return row[0] if row else None
 
 
 def find_pending_snapshots(conn, crossing_names: list[str] | None = None, limit: int = 20) -> list[dict]:
@@ -109,7 +103,7 @@ def run_worker(crossing_names: list[str] | None, poll_seconds: int, run_once: bo
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Background snapshot -> v3 prediction worker")
-    parser.add_argument("--crossing", choices=list(CROSSINGS.keys()))
+    parser.add_argument("--crossing")
     parser.add_argument("--all-crossings", action="store_true")
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--once", action="store_true")
@@ -121,7 +115,19 @@ def main():
     if not args.crossing and not args.all_crossings:
         args.all_crossings = True
 
-    crossing_names = None if args.all_crossings else [args.crossing]
+    if args.all_crossings:
+        crossing_names = None
+    else:
+        conn = init_db()
+        try:
+            available_crossings = load_crossing_names(conn)
+        finally:
+            conn.close()
+        if args.crossing not in available_crossings:
+            raise SystemExit(
+                f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}"
+            )
+        crossing_names = [args.crossing]
     run_worker(crossing_names=crossing_names, poll_seconds=args.poll_seconds, run_once=args.once)
 
 

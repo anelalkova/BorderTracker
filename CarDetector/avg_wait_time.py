@@ -27,23 +27,12 @@ from datetime import datetime, timezone, timedelta
 
 import psycopg2
 import psycopg2.extras
+from config import DB_CONFIG
+from crossings_db import load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
 
 # How many minutes back to look for "recent" completed crossings
 DEFAULT_WINDOW_MIN = 45
@@ -405,7 +394,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Estimate wait times from vehicle_crossings data"
     )
-    parser.add_argument("--crossing",      choices=CROSSINGS, default=None)
+    parser.add_argument("--crossing",      default=None)
     parser.add_argument("--all-crossings", action="store_true")
     parser.add_argument("--window",        type=int, default=DEFAULT_WINDOW_MIN,
                         help="Minutes to look back for recent crossings (default: 45)")
@@ -417,9 +406,12 @@ def main():
     if not args.crossing and not args.all_crossings:
         parser.error("Specify --crossing <name> or --all-crossings")
 
-    targets = CROSSINGS if args.all_crossings else [args.crossing]
-
     conn = get_conn()
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all_crossings else [args.crossing]
 
     for name in targets:
         cid = fetch_crossing_id(conn, name)

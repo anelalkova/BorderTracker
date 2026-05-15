@@ -38,25 +38,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
+from config import DB_CONFIG
+from crossings_db import load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
 MODEL_DIR = Path("models")
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
 
 # ---------------------------------------------------------------------------
 # DB helpers
@@ -353,8 +342,7 @@ def print_feature_importance(model_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Wait time ML model trainer")
-    parser.add_argument("--crossing",           default=None,
-                        choices=CROSSINGS)
+    parser.add_argument("--crossing",           default=None)
     parser.add_argument("--all-crossings",      action="store_true")
     parser.add_argument("--train",              action="store_true")
     parser.add_argument("--predict",            action="store_true",
@@ -370,10 +358,13 @@ def main():
     if not args.crossing and not args.all_crossings:
         parser.error("Specify --crossing <n> or --all-crossings")
 
-    targets = CROSSINGS if args.all_crossings else [args.crossing]
-
     conn = get_conn()
     print(f"PostgreSQL connected.\n")
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all_crossings else [args.crossing]
 
     for name in targets:
         print(f"\n{'='*55}")

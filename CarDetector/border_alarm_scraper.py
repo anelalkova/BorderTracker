@@ -36,30 +36,17 @@ import requests
 from bs4 import BeautifulSoup
 import psycopg2
 import psycopg2.extras
+from config import (
+    BORDERALARM_BASE_URL,
+    DB_CONFIG,
+    DEFAULT_BORDERALARM_INTERVAL_MIN,
+)
+from crossings_db import get_crossing_id, load_crossing, load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
-# borderalarm.com page slugs for each crossing
-BORDERALARM_SLUGS = {
-    "bogorodica":  "bogorodica-evzoni",
-    "tabanovce":   "tabanovce-presevo",
-    "blace":       "blace-merdare",
-    "medzitlija":  "medjitlija-niki",
-    "kafasan":     "kjafasan-qafe-thane",
-    # deve_bair and kafasan may not have pages — add slugs if they do
-}
-
-BASE_URL = "https://borderalarm.com/bottlenecks/{slug}/"
 HEADERS  = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -78,13 +65,6 @@ MK_TZ = ZoneInfo("Europe/Skopje")
 
 def get_db_conn():
     return psycopg2.connect(**DB_CONFIG)
-
-
-def get_crossing_id(conn, crossing_name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (crossing_name,))
-        row = cur.fetchone()
-        return row[0] if row else None
 
 
 def get_latest_report_time(conn, crossing_id: int) -> datetime | None:
@@ -172,7 +152,7 @@ def scrape_crossing(slug: str) -> list[dict]:
     Fetch and parse borderalarm.com page for the given crossing slug.
     Returns a list of report dicts: {reported_at, wait_minutes, reported_by, raw_text}.
     """
-    url = BASE_URL.format(slug=slug)
+    url = BORDERALARM_BASE_URL.format(slug=slug)
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         resp.raise_for_status()
@@ -272,7 +252,8 @@ def scrape_crossing(slug: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def run_crossing(crossing_name: str, conn, dry_run: bool = False, verbose: bool = True):
-    slug = BORDERALARM_SLUGS.get(crossing_name)
+    crossing = load_crossing(conn, crossing_name)
+    slug = crossing.get("borderalarm_slug") if crossing else None
     if not slug:
         print(f"  No borderalarm.com slug configured for '{crossing_name}'. Skipping.")
         return 0
@@ -286,7 +267,7 @@ def run_crossing(crossing_name: str, conn, dry_run: bool = False, verbose: bool 
     if verbose and latest:
         print(f"  Last stored report: {latest.strftime('%Y-%m-%d %H:%M UTC')}")
 
-    url = BASE_URL.format(slug=slug)
+    url = BORDERALARM_BASE_URL.format(slug=slug)
     print(f"  Scraping {url} …")
     reports = scrape_crossing(slug)
 
@@ -312,28 +293,31 @@ def run_crossing(crossing_name: str, conn, dry_run: bool = False, verbose: bool 
 def main():
     parser = argparse.ArgumentParser(description="borderalarm.com scraper for wait times")
     parser.add_argument("--crossing",  default=None,
-                        choices=list(BORDERALARM_SLUGS.keys()),
                         help="Which crossing to scrape")
     parser.add_argument("--all",       action="store_true",
                         help="Scrape all configured crossings")
     parser.add_argument("--once",      action="store_true",
                         help="Scrape once and exit")
-    parser.add_argument("--interval",  type=int, default=15,
-                        help="Polling interval in minutes (default: 15)")
+    parser.add_argument("--interval",  type=int, default=DEFAULT_BORDERALARM_INTERVAL_MIN,
+                        help="Polling interval in minutes")
     parser.add_argument("--dry-run",   action="store_true",
                         help="Print scraped data without writing to DB")
     args = parser.parse_args()
 
-    if not args.crossing and not args.all:
-        parser.error("Specify --crossing <name> or --all")
-
-    crossings_to_scrape = (
-        list(BORDERALARM_SLUGS.keys()) if args.all
-        else [args.crossing]
-    )
-
     conn = psycopg2.connect(**DB_CONFIG)
     print(f"PostgreSQL connected.\n")
+
+    available_crossings = load_crossing_names(conn, require_borderalarm_slug=True)
+
+    if not args.crossing and not args.all:
+        parser.error("Specify --crossing <name> or --all")
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(
+            f"Unknown or unsupported crossing '{args.crossing}'. "
+            f"Available: {', '.join(available_crossings)}"
+        )
+
+    crossings_to_scrape = available_crossings if args.all else [args.crossing]
 
     def run_all():
         for name in crossings_to_scrape:

@@ -36,7 +36,6 @@ Usage:
 import argparse
 import json
 from datetime import datetime, timezone
-import os
 from pathlib import Path
 
 import numpy as np
@@ -50,25 +49,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
+from config import DB_CONFIG, build_sqlalchemy_url
+from crossings_db import get_crossing_id, load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5432")),
-    "dbname":   os.getenv("DB_NAME", "border_crossing"),
-    "user":     os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "postgres"),
-}
-
 MODEL_DIR = Path(__file__).resolve().parent / "models_v3"
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
 
 # How many hours of live vehicle_crossings to use for throughput estimate
 THROUGHPUT_LOOKBACK_HOURS = 2
@@ -98,19 +86,7 @@ def get_conn():
 
 
 def get_engine():
-    c = DB_CONFIG
-    url = (
-        f"postgresql+psycopg2://{c['user']}:{c['password']}"
-        f"@{c['host']}:{c['port']}/{c['dbname']}"
-    )
-    return create_engine(url)
-
-
-def get_crossing_id(conn, name: str) -> int | None:
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM crossings WHERE name = %s", (name,))
-        row = cur.fetchone()
-        return row[0] if row else None
+    return create_engine(build_sqlalchemy_url())
 
 
 # ---------------------------------------------------------------------------
@@ -918,7 +894,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Camera-only wait estimator (physics + GBR processing time)"
     )
-    parser.add_argument("--crossing",      choices=CROSSINGS, default=None)
+    parser.add_argument("--crossing",      default=None)
     parser.add_argument("--all-crossings", action="store_true")
     parser.add_argument("--train",         action="store_true")
     parser.add_argument("--predict",       action="store_true")
@@ -928,9 +904,13 @@ def main():
     if not args.crossing and not args.all_crossings:
         parser.error("Specify --crossing <name> or --all-crossings")
 
-    targets = CROSSINGS if args.all_crossings else [args.crossing]
     conn    = get_conn()
     engine  = get_engine()
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all_crossings else [args.crossing]
 
     for name in targets:
         print(f"\n{'='*55}")

@@ -39,7 +39,32 @@ psql -U postgres -c "CREATE DATABASE border_crossing;"
 
 The schema is created automatically when you first run `border_crossings.py`.
 
-### 3. Run the camera detector
+### 3. Configure environment variables
+
+Copy the shared example file from the repo root and adjust it for your machine:
+
+```bash
+cp ../.env.example ../.env
+```
+
+Supported settings:
+
+```env
+DB_HOST=localhost
+DB_PORT=5433
+DB_NAME=border_crossing
+DB_USER=postgres
+DB_PASSWORD=postgres
+STREAM_BASE_URL=https://streaming1.neotel.net.mk/stream/{name}.m3u8
+BORDERALARM_BASE_URL=https://borderalarm.com/bottlenecks/{slug}/
+SNAPSHOT_INTERVAL_MIN=5
+BORDERALARM_INTERVAL_MIN=15
+```
+
+All BorderTracker scripts load `../.env` automatically, so teammates do not
+need to export shell variables before every run.
+
+### 4. Run the camera detector
 
 ```bash
 # Run on Bogorodica (default), saving a snapshot every 5 minutes
@@ -55,7 +80,7 @@ python border_crossings.py --list
 python border_crossings.py --crossing blace --calibrate
 ```
 
-### 4. Ingest crowdsourced wait times (optional but recommended)
+### 5. Ingest crowdsourced wait times (optional but recommended)
 
 ```bash
 # Scrape borderalarm.com once for a crossing
@@ -68,7 +93,7 @@ python borderalarm_scraper.py --crossing bogorodica
 python borderalarm_scraper.py --all
 ```
 
-### 5. Filter crowdsourced reports
+### 6. Filter crowdsourced reports
 
 Run this after scraping to flag unreliable borderalarm reports before they
 are used in model training:
@@ -84,7 +109,7 @@ python borderalarm_filter.py --crossing bogorodica --dry-run
 python borderalarm_filter.py --crossing bogorodica --show-stats
 ```
 
-### 6. Compute queue depth multipliers (optional)
+### 7. Compute queue depth multipliers (optional)
 
 Estimates how much of the queue is invisible to the camera and saves a
 per-crossing multiplier to DB. Requires filtered borderalarm data from step 5.
@@ -99,7 +124,7 @@ python queue_depth_estimator.py --crossing bogorodica --apply
 python queue_depth_estimator.py --crossing bogorodica --show
 ```
 
-### 7. Train the wait time model
+### 8. Train the wait time model
 
 Trains a gradient-boosted regression model per crossing, using camera
 `duration_sec` as ground truth. Run after collecting at least a few hours
@@ -118,7 +143,7 @@ python wait_time_model_v2.py --all-crossings --train
 python wait_time_model_v2.py --crossing bogorodica --train --model-type rf
 ```
 
-### 8. Predict current wait times
+### 9. Predict current wait times
 
 ```bash
 python wait_time_model_v2.py --crossing bogorodica --predict
@@ -137,7 +162,7 @@ Example output:
   Bogorodica L5               4      6.4 min   (4 cars × 1.6 min/vehicle)
 ```
 
-### 9. Inspect feature importances
+### 10. Inspect feature importances
 
 ```bash
 python wait_time_model_v2.py --crossing bogorodica --feature-importance
@@ -156,16 +181,17 @@ python wait_time_model_v2.py --crossing bogorodica --feature-importance
 | `kafasan` | Kafasan | МК–АЛ (Albania) |
 | `medzitlija` | Megjitlija | МК–ГР (Greece) |
 
-Stream URLs are hardcoded in `border_crossings.py` as `.m3u8` HLS streams.
+Stream URLs now come from `STREAM_BASE_URL` in the repo-level `.env`.
+The default still points to the current `.m3u8` HLS endpoint template.
 
 **TODO:** Replace hardcoded URLs with a scraper that parses
 `https://roads.org.mk/patna-mreza/video-kameri/` — the page loads streams
 via JavaScript, so use `playwright` or `selenium` to get the rendered DOM,
 then extract `<source src="...">` or the JS config object.
 
-Crossings with borderalarm.com pages: `bogorodica`, `tabanovce`, `blace`, `medzitlija`.
-`deve_bair` and `kafasan` are not yet configured — add slugs to `BORDERALARM_SLUGS`
-in `borderalarm_scraper.py` if pages become available.
+Crossings with borderalarm.com pages are configured through the `crossings`
+table (`borderalarm_slug` column). Update the seeded rows in `schema.sql`
+if a slug changes or a new page becomes available.
 
 ---
 
@@ -178,13 +204,21 @@ Each camera has a different angle and zoom level.
 2. A clean frame appears – take a screenshot (press `S`)
 3. Open the screenshot and note pixel coords of lane boundaries
 4. Divide by frame width/height to get fractional coords
-5. Update `CROSSINGS[<name>]["lanes"]` in `border_crossings.py`
+5. Update the seeded `lane_config` for that crossing in `schema.sql`
 
 ---
 
 ## Database
 
 PostgreSQL database: `border_crossing`
+
+The `crossings` table is the shared source of truth for:
+- display names
+- neighbouring country metadata
+- borderalarm page slugs
+- lane polygon configuration
+
+These values are seeded from `schema.sql` and loaded from the DB at runtime.
 
 ### Tables
 

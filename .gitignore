@@ -8,6 +8,9 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+.env
+.env.*
+!.env.example
 
 # OS junk
 .DS_Store

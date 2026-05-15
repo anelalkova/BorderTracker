@@ -29,23 +29,12 @@ from datetime import timedelta, timezone
 
 import psycopg2
 import psycopg2.extras
+from config import DB_CONFIG
+from crossings_db import load_crossing_names
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-
-DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
-}
-
-CROSSINGS = [
-    "bogorodica", "blace", "tabanovce",
-    "deve_bair", "kafasan", "medzitlija",
-]
 
 MAX_RATIO            = 3.0
 ABSOLUTE_MAX_MIN     = 240
@@ -265,7 +254,7 @@ def show_stats(conn, crossing_id: int, crossing_name: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Filter borderalarm crowdsourced reports")
-    parser.add_argument("--crossing",   choices=CROSSINGS, default=None)
+    parser.add_argument("--crossing",   default=None)
     parser.add_argument("--all",        action="store_true")
     parser.add_argument("--dry-run",    action="store_true")
     parser.add_argument("--show-stats", action="store_true")
@@ -276,8 +265,12 @@ def main():
     if not args.crossing and not args.all:
         parser.error("Specify --crossing <name> or --all")
 
-    targets = CROSSINGS if args.all else [args.crossing]
     conn    = get_conn()
+    available_crossings = load_crossing_names(conn)
+    if args.crossing and args.crossing not in available_crossings:
+        parser.error(f"Unknown crossing '{args.crossing}'. Available: {', '.join(available_crossings)}")
+
+    targets = available_crossings if args.all else [args.crossing]
 
     ensure_schema(conn)
 
