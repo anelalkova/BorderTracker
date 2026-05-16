@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="60e8bc67-93fc-46ae-8d7a-bdb608a30087" name="Changes" comment="Initial commit">
+      <change beforePath="$PROJECT_DIR$/.idea/CarDetector.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CarDetector.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/avg_wait_time.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l1_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l2_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l4_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l5_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/bogorodica_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/blace_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/blace_rf.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v2/bogorodica_gbr.joblib" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_v3/bogorodica_proc_time.joblib" beforeDir="false" afterPath="$PROJECT_DIR$/models_v3/bogorodica_proc_time.joblib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/blace_20260421_184346.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/bogorodica_20260421_183932.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/deve_bair_20260421_184424.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_184449.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_195255.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200625.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200639.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200658.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200748.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200752.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201058.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201933.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_205142.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_160528.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_192841.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201258.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201300.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_202329.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_203539.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204343.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204350.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204558.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_205127.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_210925.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260507_231404.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260508_170955.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/medzitlija_20260421_184507.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/screenshots/tabanovce_20260421_184318.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/snapshot_predict_worker.py" beforeDir="false" afterPath="$PROJECT_DIR$/snapshot_predict_worker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wait_time_estimator.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/wait_time_model_v2.py" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$/.." value="master" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;anelalkova&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/anelalkova/BorderTracker.git&quot;,
+    &quot;accountId&quot;: &quot;c7d56211-a189-4435-be1e-17c8a86c790a&quot;
+  }
+}</component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="3DVh08QnAzv4ceN75AfM42BSDtZ" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Database Script.blace_data_dump.sql.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
+    "git-widget-placeholder": "#4 on snapshot-predict-worker-v3",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/User/Desktop/IKT Proekt/CarDetector/db_dumps/blace_crossing_queue_multipliers.csv",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
+    ],
+    "RunConfigurationTargetLRU": [
+      "ca4c29c9-2342-4596-a639-645e4743a8fb/database/\"border_crossing\"/schema/\"public\""
+    ]
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration name="blace_data_dump.sql" type="DatabaseScript" editBeforeRun="true" temporary="true" nameIsGenerated="true">
+      <script-file value="$PROJECT_DIR$/db_dumps/blace_data_dump.sql" />
+      <script-mode>FILE</script-mode>
+      <data-source id="ca4c29c9-2342-4596-a639-645e4743a8fb" namespace="database/&quot;border_crossing&quot;/schema/&quot;public&quot;" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Database Script.blace_data_dump.sql" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-7c0b70fcd90d-JavaScript-PY-242.21829.153" />
+        <option value="bundled-python-sdk-464836ebc622-b74155a9e76b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-242.21829.153" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="60e8bc67-93fc-46ae-8d7a-bdb608a30087" name="Changes" comment="" />
+      <created>1778372918615</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1778372918615</updated>
+      <workItem from="1778372920047" duration="2477000" />
+      <workItem from="1778426930659" duration="1161000" />
+      <workItem from="1778530823476" duration="4922000" />
+      <workItem from="1778702510187" duration="4270000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Initial commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="Initial commit" />
+  </component>
+</project>

@@ -1,0 +1,9 @@
+id,crossing_id,reported_at,wait_minutes,reported_by,source,raw_text,quality_flag,camera_avg_min
+8,5,2026-05-07 10:27:00+02,15,anonymous_,borderalarm,by anonymous_ | 15 min | 07.05.2026 10:27 | by anonymous_ | Report waiting time,no_camera_data,
+7,5,2026-05-07 11:25:00+02,10,anonymous_,borderalarm,by anonymous_ | 10 min | 07.05.2026 11:25 | by anonymous_ | 15 min,no_camera_data,
+6,5,2026-05-07 12:28:00+02,5,anonymous_,borderalarm,by anonymous_ | 5 min | 07.05.2026 12:28 | by anonymous_ | 10 min,ok,0.2
+5,5,2026-05-07 13:28:00+02,15,anonymous_,borderalarm,by anonymous_ | 15 min | 07.05.2026 13:28 | by anonymous_ | 5 min,ok,0.2
+4,5,2026-05-07 14:29:00+02,10,anonymous_,borderalarm,by anonymous_ | 10 min | 07.05.2026 14:29 | by anonymous_ | 15 min,ok,0.2
+3,5,2026-05-07 15:24:00+02,5,anonymous_,borderalarm,by anonymous_ | 5 min | 07.05.2026 15:24 | by anonymous_ | 10 min,ok,0.3
+2,5,2026-05-07 16:25:00+02,15,anonymous_,borderalarm,by anonymous_ | 15 min | 07.05.2026 16:25 | by anonymous_ | 5 min,ok,0.2
+1,5,2026-05-07 17:27:00+02,10,anonymous_,borderalarm,Lastly reported | 10 min | 07.05.2026 17:27 | by anonymous_ | 15 min,ok,0.3
