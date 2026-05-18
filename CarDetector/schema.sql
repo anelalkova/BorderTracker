@@ -6,10 +6,12 @@
 -- ── Static reference data ────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS crossings (
-    id           SERIAL PRIMARY KEY,
-    name         TEXT   NOT NULL UNIQUE,
-    display_name TEXT   NOT NULL,
-    neighbor     TEXT   NOT NULL
+    id           SERIAL          PRIMARY KEY,
+    name         TEXT            NOT NULL UNIQUE,
+    display_name TEXT            NOT NULL,
+    neighbor     TEXT            NOT NULL,
+    latitude     DOUBLE PRECISION,
+    longitude    DOUBLE PRECISION
 );
 
 -- ── Raw vehicle count snapshots (periodic overview) ──────────
@@ -262,11 +264,11 @@ WHERE csh.avg_wait_minutes IS NOT NULL;  -- only rows with ground truth labels
 
 -- ── Seed crossings ────────────────────────────────────────────
 
-INSERT INTO crossings (name, display_name, neighbor) VALUES
-    ('bogorodica', 'Bogorodica (МК–ГР)', 'Greece'),
-    ('blace',      'Blace (МК–КС)',      'Kosovo'),
-    ('tabanovce',  'Tabanovce (МК–СР)',  'Serbia'),
-    ('deve_bair',  'Deve Bair (МК–БГ)', 'Bulgaria'),
-    ('kafasan',    'Kafasan (МК–АЛ)',    'Albania'),
-    ('medzitlija', 'Megjitlija (МК–ГР)', 'Greece')
+INSERT INTO crossings (name, display_name, neighbor, latitude, longitude) VALUES
+    ('bogorodica', 'Bogorodica (МК–ГР)', 'Greece',   41.135060600365165,  22.549000750027545),
+    ('blace',      'Blace (МК–КС)',      'Kosovo',   42.13921377796023,  21.305741596231403),
+    ('tabanovce',  'Tabanovce (МК–СР)',  'Serbia',   42.235180081087194,  21.704862868164376),
+    ('deve_bair',  'Deve Bair (МК–БГ)', 'Bulgaria',  42.221126212330134,  22.459115712211727),
+    ('kafasan',    'Kafasan (МК–АЛ)',    'Albania',  41.09191585867863,  20.609634718160073),
+    ('medzitlija', 'Megjitlija (МК–ГР)', 'Greece',   40.92035263629112,  21.41811780211385)
 ON CONFLICT (name) DO NOTHING;
