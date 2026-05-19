@@ -36,6 +36,7 @@ Usage:
 import argparse
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 
 import numpy as np
@@ -55,14 +56,14 @@ import joblib
 # ---------------------------------------------------------------------------
 
 DB_CONFIG = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "border_crossing",
-    "user":     "postgres",
-    "password": "postgres",
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "port":     int(os.getenv("DB_PORT", "5432")),
+    "dbname":   os.getenv("DB_NAME", "border_crossing"),
+    "user":     os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "postgres"),
 }
 
-MODEL_DIR = Path("models_v3")
+MODEL_DIR = Path(__file__).resolve().parent / "models_v3"
 
 CROSSINGS = [
     "bogorodica", "blace", "tabanovce",
@@ -453,20 +454,29 @@ def get_live_throughput(conn, crossing_id: int,
     return result
 
 
-def get_latest_snapshot(conn, crossing_id: int) -> dict:
+def get_snapshot(conn, crossing_id: int, snapshot_id: int | None = None) -> dict:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("""
-            SELECT lane_breakdown, captured_at, total_vehicles
-            FROM snapshots
-            WHERE crossing_id = %s
-            ORDER BY captured_at DESC LIMIT 1
-        """, (crossing_id,))
+        if snapshot_id is not None:
+            cur.execute("""
+                SELECT id, lane_breakdown, captured_at, total_vehicles
+                FROM snapshots
+                WHERE crossing_id = %s AND id = %s
+                LIMIT 1
+            """, (crossing_id, snapshot_id))
+        else:
+            cur.execute("""
+                SELECT id, lane_breakdown, captured_at, total_vehicles
+                FROM snapshots
+                WHERE crossing_id = %s
+                ORDER BY captured_at DESC LIMIT 1
+            """, (crossing_id,))
         row = cur.fetchone()
 
     if not row:
         return {}
 
     result = {
+        "_snapshot_id":     int(row["id"]),
         "_captured_at":    row["captured_at"],
         "_total_vehicles": int(row["total_vehicles"] or 0),
     }
@@ -534,6 +544,7 @@ def predict_proc_time_from_model(model_path: Path, lane_name: str,
 # ---------------------------------------------------------------------------
 
 def estimate_wait(conn, crossing_id: int, multipliers: dict,
+                  snapshot: dict | None = None,
                   model_path: Path | None = None,
                   verbose: bool = False) -> dict:
     """
@@ -551,7 +562,8 @@ def estimate_wait(conn, crossing_id: int, multipliers: dict,
         2. Crossing-wide median from other lanes (same booth policy)
         3. GBR model prediction for this lane/hour/conditions
     """
-    snap        = get_latest_snapshot(conn, crossing_id)
+    snap        = dict(snapshot) if snapshot is not None else get_snapshot(conn, crossing_id)
+    snapshot_id = snap.pop("_snapshot_id", None)
     captured_at = snap.pop("_captured_at", datetime.now(timezone.utc))
     total_veh   = snap.pop("_total_vehicles", 0)
     throughput  = get_live_throughput(conn, crossing_id)
@@ -675,6 +687,7 @@ def estimate_wait(conn, crossing_id: int, multipliers: dict,
 
     return {
         "lanes":          results,
+        "snapshot_id":    snapshot_id,
         "snapshot_at":    str(ts),
         "total_vehicles": total_veh,
         "multiplier":     mult,
@@ -690,6 +703,171 @@ def estimate_wait(conn, crossing_id: int, multipliers: dict,
             "total_visible":     total_visible,
         },
     }
+
+
+def save_wait_estimate(conn, crossing_id: int, result: dict, model_path: Path | None) -> int:
+    """
+    Save the v3 crossing-level estimate and keep the full lane-level payload in
+    context_json for later backend/UI use.
+    """
+    crossing_wait = result["crossing_wait"]
+    estimated_wait = crossing_wait["weighted_wait_min"]
+    snapshot_id = result.get("snapshot_id")
+    snapshot_at = result.get("snapshot_at")
+
+    if isinstance(snapshot_at, str):
+        try:
+            estimated_at = datetime.fromisoformat(snapshot_at)
+        except ValueError:
+            estimated_at = datetime.now(timezone.utc)
+    else:
+        estimated_at = snapshot_at or datetime.now(timezone.utc)
+
+    context = {
+        "snapshot_id": snapshot_id,
+        "snapshot_at": result.get("snapshot_at"),
+        "total_vehicles": result.get("total_vehicles"),
+        "multiplier": result.get("multiplier"),
+        "hour": result.get("hour"),
+        "crossing_wait": crossing_wait,
+        "lanes": result.get("lanes", {}),
+        "estimator_version": "v3",
+    }
+
+    model_version = model_path.name if model_path else "wait_estimator_v3:no-model"
+    confidence = None
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO wait_time_estimates
+                (crossing_id, snapshot_id, estimated_at, estimated_wait_minutes,
+                 confidence, model_version, context_json)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            crossing_id,
+            snapshot_id,
+            estimated_at,
+            estimated_wait,
+            confidence,
+            model_version,
+            psycopg2.extras.Json(context),
+        ))
+        estimate_id = cur.fetchone()[0]
+    conn.commit()
+    return estimate_id
+
+
+def estimate_and_save(conn, crossing_id: int, snapshot_id: int,
+                      model_path: Path | None = None,
+                      verbose: bool = False) -> dict:
+    """
+    Estimate wait time for a concrete snapshot and persist the v3 output.
+    """
+    multipliers = load_multiplier(conn, crossing_id)
+    snapshot = get_snapshot(conn, crossing_id, snapshot_id=snapshot_id)
+    if not snapshot:
+        raise ValueError(f"Snapshot {snapshot_id} not found for crossing {crossing_id}")
+
+    result = estimate_wait(
+        conn,
+        crossing_id,
+        multipliers,
+        snapshot=snapshot,
+        model_path=model_path if model_path and model_path.exists() else None,
+        verbose=verbose,
+    )
+    estimate_id = save_wait_estimate(conn, crossing_id, result, model_path)
+    result["estimate_id"] = estimate_id
+    result["estimated_wait_minutes"] = result["crossing_wait"]["weighted_wait_min"]
+    return result
+
+
+def save_v3_result(conn, crossing_id: int, result: dict, model_path: Path | None) -> int:
+    """
+    Persist the v3 output into a dedicated table keyed by snapshot_id.
+    """
+    crossing_wait = result["crossing_wait"]
+    estimated_wait = crossing_wait["weighted_wait_min"]
+    snapshot_id = result.get("snapshot_id")
+    if snapshot_id is None:
+        raise ValueError("snapshot_id is required for v3 result persistence")
+
+    snapshot_at = result.get("snapshot_at")
+    if isinstance(snapshot_at, str):
+        try:
+            estimated_at = datetime.fromisoformat(snapshot_at)
+        except ValueError:
+            estimated_at = datetime.now(timezone.utc)
+    else:
+        estimated_at = snapshot_at or datetime.now(timezone.utc)
+
+    result_json = {
+        "snapshot_id": snapshot_id,
+        "snapshot_at": result.get("snapshot_at"),
+        "total_vehicles": result.get("total_vehicles"),
+        "multiplier": result.get("multiplier"),
+        "hour": result.get("hour"),
+        "crossing_wait": crossing_wait,
+        "lanes": result.get("lanes", {}),
+        "estimator_version": "v3",
+    }
+
+    model_version = model_path.name if model_path else "wait_estimator_v3:no-model"
+    confidence = None
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO wait_estimator_v3_results
+                (crossing_id, snapshot_id, estimated_at, estimated_wait_minutes,
+                 confidence, model_version, result_json)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (snapshot_id) DO UPDATE
+            SET crossing_id = EXCLUDED.crossing_id,
+                estimated_at = EXCLUDED.estimated_at,
+                estimated_wait_minutes = EXCLUDED.estimated_wait_minutes,
+                confidence = EXCLUDED.confidence,
+                model_version = EXCLUDED.model_version,
+                result_json = EXCLUDED.result_json
+            RETURNING id
+        """, (
+            crossing_id,
+            snapshot_id,
+            estimated_at,
+            estimated_wait,
+            confidence,
+            model_version,
+            psycopg2.extras.Json(result_json),
+        ))
+        estimate_id = cur.fetchone()[0]
+    conn.commit()
+    return estimate_id
+
+
+def estimate_and_save_v3_result(conn, crossing_id: int, snapshot_id: int,
+                                model_path: Path | None = None,
+                                verbose: bool = False) -> dict:
+    """
+    Estimate wait time for a concrete snapshot and persist the result into the
+    dedicated v3 results table.
+    """
+    multipliers = load_multiplier(conn, crossing_id)
+    snapshot = get_snapshot(conn, crossing_id, snapshot_id=snapshot_id)
+    if not snapshot:
+        raise ValueError(f"Snapshot {snapshot_id} not found for crossing {crossing_id}")
+
+    result = estimate_wait(
+        conn,
+        crossing_id,
+        multipliers,
+        snapshot=snapshot,
+        model_path=model_path if model_path and model_path.exists() else None,
+        verbose=verbose,
+    )
+    estimate_id = save_v3_result(conn, crossing_id, result, model_path)
+    result["estimate_id"] = estimate_id
+    result["estimated_wait_minutes"] = result["crossing_wait"]["weighted_wait_min"]
+    return result
 
 
 # ---------------------------------------------------------------------------

@@ -1,14 +1,1 @@
-# IntelliJ / JetBrains
 .idea/
-*.iml
-
-# Python (if you use it)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-
-# OS junk
-.DS_Store
-Thumbs.db
