@@ -56,7 +56,8 @@ def find_pending_snapshots(conn, crossing_names: list[str] | None = None, limit:
 def process_snapshot(conn, crossing_name: str, crossing_id: int, snapshot_id: int) -> int | None:
     model_path = WAIT_MODEL_DIR / f"{crossing_name}_proc_time.joblib"
     if not model_path.exists():
-        print(f"[ML] No v3 model for {crossing_name} at {model_path.name}; skipping snapshot {snapshot_id}.")
+        print(f"[ML] No v3 model for {crossing_name} at {model_path.name}; marking as skipped.")
+        _mark_snapshot_failed(conn, snapshot_id, f"no model: {model_path.name}")
         return None
 
     result = estimate_and_save_v3_result(
@@ -71,7 +72,6 @@ def process_snapshot(conn, crossing_name: str, crossing_id: int, snapshot_id: in
         f"snapshot_id={result['snapshot_id']}"
     )
     return result["estimate_id"]
-
 
 def run_worker(crossing_names: list[str] | None, poll_seconds: int, run_once: bool) -> None:
     conn = init_db()

@@ -143,15 +143,19 @@ def load_multiplier(conn, crossing_id: int) -> dict:
 
     return {"global": float(row["multiplier"]), "tod": tod}
 
-
-def get_multiplier_for_hour(hour: int, multipliers: dict) -> float:
+def get_multiplier_for_hour(hour: int, multipliers: dict, visible_queue: int = 0) -> float:
     tod = multipliers.get("tod", {})
-    if   0  <= hour < 6  and tod.get("overnight"): return tod["overnight"]
-    elif 6  <= hour < 12 and tod.get("morning"):   return tod["morning"]
-    elif 12 <= hour < 18 and tod.get("afternoon"): return tod["afternoon"]
-    elif 18 <= hour < 24 and tod.get("evening"):   return tod["evening"]
-    return multipliers.get("global", DEFAULT_MULTIPLIER)
+    if   0  <= hour < 6  and tod.get("overnight"): base = tod["overnight"]
+    elif 6  <= hour < 12 and tod.get("morning"):   base = tod["morning"]
+    elif 12 <= hour < 18 and tod.get("afternoon"): base = tod["afternoon"]
+    elif 18 <= hour < 24 and tod.get("evening"):   base = tod["evening"]
+    else: base = multipliers.get("global", DEFAULT_MULTIPLIER)
 
+    if visible_queue <= 2:
+        return min(base, 2.0)
+    if visible_queue <= 5:
+        return min(base, base * 0.5)
+    return base
 
 # ---------------------------------------------------------------------------
 # GBR sub-model: predicts avg_processing_sec per lane per hour

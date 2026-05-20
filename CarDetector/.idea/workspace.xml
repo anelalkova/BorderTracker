@@ -1,53 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="60e8bc67-93fc-46ae-8d7a-bdb608a30087" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/CarDetector.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CarDetector.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
+    <list default="true" id="60e8bc67-93fc-46ae-8d7a-bdb608a30087" name="Changes" comment="Add snapshot scheduler">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/avg_wait_time.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/border_data.sqlite" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l1_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l2_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l4_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/bogorodica__bogorodica_l5_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/bogorodica_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models_v2/blace_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models_v2/blace_rf.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models_v2/bogorodica_gbr.joblib" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/models_v3/blace_proc_time.joblib" beforeDir="false" afterPath="$PROJECT_DIR$/models_v3/blace_proc_time.joblib" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/queue_depth_estimator.py" beforeDir="false" afterPath="$PROJECT_DIR$/queue_depth_estimator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/blace_20260421_184346.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/bogorodica_20260421_183932.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/deve_bair_20260421_184424.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_184449.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260421_195255.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200625.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200639.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200658.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200748.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_200752.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201058.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_201933.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260505_205142.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_160528.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_192841.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201258.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_201300.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_202329.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_203539.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204343.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204350.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_204558.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_205127.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260506_210925.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260507_231404.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/kafasan_20260508_170955.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/medzitlija_20260421_184507.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/screenshots/tabanovce_20260421_184318.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/wait_time_estimator.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/wait_time_model_v2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/snapshot_predict_worker.py" beforeDir="false" afterPath="$PROJECT_DIR$/snapshot_predict_worker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wait_estimator_v3.py" beforeDir="false" afterPath="$PROJECT_DIR$/wait_estimator_v3.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -64,6 +21,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;anelalkova&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/anelalkova/BorderTracker&quot;,
+    &quot;accountId&quot;: &quot;fab991fc-cdb8-4eda-84e0-9115bab88628&quot;
+  }
+}</component>
   <component name="KubernetesApiPersistence">{}</component>
   <component name="KubernetesApiProvider">{
   &quot;isMigrated&quot;: true
@@ -77,34 +46,34 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/Maca/BorderTracker/CarDetector&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/Maca/BorderTracker/CarDetector",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;postgresql&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
     ]
   }
-}</component>
+}]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
-        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.31033.145" />
+        <option value="bundled-python-sdk-b63d5a1f7c97-b61e75351b1f-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-261.22158.340" />
       </set>
     </attachedChunks>
   </component>
@@ -117,6 +86,7 @@
       <updated>1778372918615</updated>
       <workItem from="1778372920047" duration="2477000" />
       <workItem from="1778426930659" duration="1161000" />
+      <workItem from="1779261184679" duration="7570000" />
     </task>
     <servers />
   </component>
