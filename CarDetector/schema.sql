@@ -10,20 +10,29 @@ CREATE TABLE IF NOT EXISTS crossings (
     name         TEXT   NOT NULL UNIQUE,
     display_name TEXT   NOT NULL,
     neighbor     TEXT   NOT NULL,
+    camera_url   TEXT,
+    latitude     DOUBLE PRECISION,
+    longitude    DOUBLE PRECISION,
     borderalarm_slug TEXT,
     lane_config  JSONB  NOT NULL DEFAULT '{}'::jsonb
 );
 
 ALTER TABLE crossings
+    ADD COLUMN IF NOT EXISTS camera_url TEXT,
+    ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
     ADD COLUMN IF NOT EXISTS borderalarm_slug TEXT,
     ADD COLUMN IF NOT EXISTS lane_config JSONB NOT NULL DEFAULT '{}'::jsonb;
 
-INSERT INTO crossings (name, display_name, neighbor, borderalarm_slug, lane_config)
+INSERT INTO crossings (name, display_name, neighbor, camera_url, latitude, longitude, borderalarm_slug, lane_config)
 VALUES
     (
         'bogorodica',
         'Bogorodica (МК–ГР)',
         'Greece',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/bogorodica.m3u8',
+        41.1484,
+        22.5097,
         'bogorodica-evzoni',
         $${
           "Bogorodica L1": [[0.32, 0.12], [0.39, 0.14], [0.00, 0.53], [0.00, 0.25]],
@@ -37,6 +46,9 @@ VALUES
         'blace',
         'Blace (МК–КС)',
         'Kosovo',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/blace.m3u8',
+        42.2046,
+        21.2874,
         'blace-merdare',
         $${
           "Blace L1": [[0.480, 0.135], [0.435, 0.211], [0.368, 0.343], [0.308, 0.474], [0.250, 0.625], [0.196, 0.769], [0.140, 0.918], [0.117, 0.993], [0.003, 0.997], [0.000, 0.720], [0.100, 0.542], [0.193, 0.394], [0.264, 0.301], [0.347, 0.214], [0.438, 0.123]],
@@ -48,6 +60,9 @@ VALUES
         'tabanovce',
         'Tabanovce (МК–СР)',
         'Serbia',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/tabanovce.m3u8',
+        42.2215,
+        21.7141,
         'tabanovce-presevo',
         $${
           "Tabanovce L1": [[0.516, 0.177], [0.494, 0.137], [0.356, 0.161], [0.217, 0.215], [0.006, 0.389], [0.003, 0.641], [0.203, 0.384], [0.311, 0.297]],
@@ -59,6 +74,9 @@ VALUES
         'deve_bair',
         'Deve Bair (МК–БГ)',
         'Bulgaria',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/deve_bair.m3u8',
+        42.1861,
+        22.3386,
         NULL,
         $${
           "DeveBair L1": [[0.406, 0.168], [0.396, 0.234], [0.345, 0.340], [0.062, 0.992], [0.423, 0.996], [0.494, 0.353], [0.507, 0.168]],
@@ -69,6 +87,9 @@ VALUES
         'kafasan',
         'Kafasan (МК–АЛ)',
         'Albania',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/kafasan.m3u8',
+        41.1176,
+        20.5955,
         'kjafasan-qafe-thane',
         $${
           "Kafasan L1": [[0.511, 0.243], [0.508, 0.341], [0.233, 0.994], [0.006, 0.994], [0.004, 0.716], [0.414, 0.246]],
@@ -79,6 +100,9 @@ VALUES
         'medzitlija',
         'Megjitlija (МК–ГР)',
         'Greece',
+        'https://roads.org.mk/streamer.html?src=https://streaming1.neotel.net.mk/stream/medzitlija.m3u8',
+        40.9369,
+        21.2482,
         'medjitlija-niki',
         $${
           "Medzitlija L1": [[0.366, 0.220], [0.002, 0.506], [0.000, 0.332], [0.236, 0.222], [0.333, 0.193]],
@@ -88,6 +112,9 @@ VALUES
 ON CONFLICT (name) DO UPDATE SET
     display_name = EXCLUDED.display_name,
     neighbor = EXCLUDED.neighbor,
+    camera_url = EXCLUDED.camera_url,
+    latitude = EXCLUDED.latitude,
+    longitude = EXCLUDED.longitude,
     borderalarm_slug = EXCLUDED.borderalarm_slug,
     lane_config = EXCLUDED.lane_config;
 
