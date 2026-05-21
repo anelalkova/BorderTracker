@@ -1,0 +1,8 @@
+__pycache__
+*.py[cod]
+.git
+.idea
+*.iml
+db_dumps
+*.mp4
+*.avi

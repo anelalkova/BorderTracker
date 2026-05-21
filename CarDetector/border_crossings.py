@@ -136,6 +136,16 @@ CROSSINGS = {
     },
 }
 
+# WGS84 coordinates for `crossings.latitude` / `crossings.longitude` (NOT NULL in API schema / Flyway).
+CROSSING_COORDS = {
+    "bogorodica": (41.1484, 22.5097),
+    "blace": (42.2046, 21.2874),
+    "tabanovce": (42.2215, 21.7141),
+    "deve_bair": (42.1861, 22.3386),
+    "kafasan": (41.1176, 20.5955),
+    "medzitlija": (40.9369, 21.2482),
+}
+
 # ---------------------------------------------------------------------------
 # Minimum frames a vehicle must be tracked before we save it.
 # At ~10fps, 15 frames = ~1.5 seconds — filters out false positives.
@@ -152,11 +162,12 @@ def init_db() -> psycopg2.extensions.connection:
     conn = psycopg2.connect(**DB_CONFIG)
     with conn.cursor() as cur:
         for name, cfg in CROSSINGS.items():
+            lat, lon = CROSSING_COORDS[name]
             cur.execute("""
-                INSERT INTO crossings (name, display_name, neighbor)
-                VALUES (%s, %s, %s)
+                INSERT INTO crossings (name, display_name, neighbor, latitude, longitude)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (name) DO NOTHING
-            """, (name, cfg["display_name"], cfg["neighbor"]))
+            """, (name, cfg["display_name"], cfg["neighbor"], lat, lon))
         cur.execute("""
             CREATE TABLE IF NOT EXISTS crossing_queue_multipliers (
                 id          BIGSERIAL PRIMARY KEY,

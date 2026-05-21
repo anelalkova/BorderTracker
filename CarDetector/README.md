@@ -6,6 +6,27 @@ for per-lane wait time prediction.
 
 ---
 
+## Docker (Boardview monorepo)
+
+From `deployment/`:
+
+```bash
+# API + UI + Postgres + headless snapshot worker (YOLO → `snapshots`)
+docker compose up --build
+```
+
+Optional **v3 predict** worker (needs trained models as `models_v3/<crossing>_proc_time.joblib`):
+
+```bash
+docker compose --profile ml up --build
+```
+
+**Database env** (same as `border_crossings.DB_CONFIG`): `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. In Compose, `DB_HOST` is the service name `db`.
+
+Install locally: `pip install -r requirements.txt` (see below for the classic `pip install …` one-liner).
+
+---
+
 ## Files
 
 | File | Purpose |
