@@ -53,11 +53,11 @@ import requests
 # PostgreSQL connection config
 # ---------------------------------------------------------------------------
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5432")),
-    "dbname":   os.getenv("DB_NAME", "border_crossing"),
-    "user":     os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "postgres"),
+    "host":     os.getenv("DB_HOST", os.getenv("PGHOST", "localhost")),
+    "port":     int(os.getenv("DB_PORT", os.getenv("PGPORT", "5432"))),
+    "dbname":   os.getenv("DB_NAME", os.getenv("PGDATABASE", "border_crossing")),
+    "user":     os.getenv("DB_USER", os.getenv("PGUSER", "postgres")),
+    "password": os.getenv("DB_PASSWORD", os.getenv("PGPASSWORD", "postgres")),
 }
 
 WAIT_MODEL_DIR = Path(__file__).resolve().parent / "models_v3"
