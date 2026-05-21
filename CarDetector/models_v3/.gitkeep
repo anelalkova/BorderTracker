@@ -1,0 +1,2 @@
+# Place trained v3 models here: `<crossing>_proc_time.joblib` (e.g. `bogorodica_proc_time.joblib`).
+# Used by `snapshot_predict_worker.py` and `wait_estimator_v3.py`.
